@@ -1,6 +1,6 @@
 # Zen Development Kit (ZDK)  
 Official Style Guidelines and Coding Standard  
-Version 1.1.0 — December 2025  
+Version 1.2.0 — December 2025  
 https://github.com/z-libs
 
 ## Purpose of This Document
@@ -53,25 +53,62 @@ Libraries MAY optionally expose short aliases (`vec_push`, `map_get`, etc.) when
 
 ## 4. Formatting Rules
 
-- Indentation: exactly 4 spaces (never tabs).
+- Indentation: exactly 4 spaces (tabs are forbidden).
 - Line width: maximum 100 columns.
-- Brace style: Allman (opening brace on new line).
-- Pointer asterisks bind to the variable:
-    * Allowed: `int *ptr`.
-    * NOT allowed: `int* ptr`or `int * ptr`.
-- Space after keywords: `if (condition)`.
-- No space between function name and parenthesis: `zvec_push(v, x)`.
-- One space around binary operators, no space around unary operators.
-- Blank line between top-level declarations.
+- Blank line between top-level declarations (functions, types, macros).
 - No trailing whitespace.
 - Files MUST start and end with exactly one newline.
-- All preprocessor directives (`#if`, `#define`, `#include`, `#endif`, etc.) **MUST** start at column 1 (no leading whitespace).
 
-### 4.1 Preprocessor Directives
+### 4.1 Brace Style - Allman.
+
+Opening brace goes on its own line.
+
+```c
+if (condition)
+{
+    do_work();
+}
+```
+
+### 4.2 Pointer Declarators
+
+Pointer asterisks bind to the variable, not the type:
+- Allowed: `int *ptr`.
+- NOT allowed: `int* ptr`or `int * ptr`.
+
+## 4.3 Spacing Rules
+
+- One space after keywords: `if (x)`, `while (n)`, `for (i = 0; ...)`.
+- No space between function name and parenthesis: `zvec_push(v, x)`.
+- One space around all binary and ternary operators.
+- No space around unary operators.
+
+### 4.4 Preprocessor Directives
 
 - All `#if`, `#elif`, `#else`, `#endif`, `#include`, `#define`, etc. MUST begin at column 1.
 - Content inside such blocks is indented with exactly four spaces.
 - The only exception is when a directive appears inside a macro expansion that itself is indented, in which case the entire block may be uniformly indented.
+
+### 4.5 Yoda Conditions
+
+In any comparison where one side is a literal, constant, or macro (including 0, NULL, Z_OK, Z_ERR), the constant MUST be on the left.
+
+- Correct:
+
+```c
+if (42 == x)
+if (NULL == ptr)
+if (Z_OK == result)
+if (0 == memcmp(a, b, n))
+```
+
+- Forbidden:
+
+```c
+if (x == 42)
+if (ptr == NULL)
+if (result == Z_OK)
+```
 
 ## 5. Header Layout Standard
 
