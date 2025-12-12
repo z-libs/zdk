@@ -15,13 +15,13 @@ extern "C" {
 #endif
 
 /* Some configs. */
-// #define Z_ENABLE_TRACE  /* Uncomment to enable stack traces. */
-// #define Z_DEBUG         /* Uncomment to enable breakpoints on error. */
-// #define Z_NO_COLOR      /* Uncomment to disable ANSI colors. */
+// #define ZERROR_ENABLE_TRACE  /* Uncomment to enable stack traces. */
+// #define ZERROR_DEBUG         /* Uncomment to enable breakpoints on error. */
+// #define ZERROR_NO_COLOR      /* Uncomment to disable ANSI colors. */
 
 /* Allow user override for panic action (default: abort). */
-#ifndef Z_PANIC_ACTION
-    #define Z_PANIC_ACTION() abort()
+#ifndef ZERROR_PANIC_ACTION
+    #define ZERROR_PANIC_ACTION() abort()
 #endif
 
 /* Feature detection. */
@@ -51,7 +51,7 @@ extern "C" {
 #define Z_UID(prefix) Z_CONCAT(prefix, __LINE__)
 
 /* Debug trap. */
-#if defined(Z_DEBUG)
+#if defined(ZERROR_DEBUG)
     #if defined(_MSC_VER)
         #define Z_TRAP() __debugbreak()
     #elif defined(__GNUC__) || defined(__clang__)
@@ -78,7 +78,7 @@ typedef struct
 zerr zerr_create_impl(int code, const char *file, int line, const char *func, const char *fmt, ...);
 zerr zerr_errno_impl(int code, const char *file, int line, const char *func, const char *fmt, ...);
 
-/* * Create Error: Captures location, traps debugger (if Z_DEBUG), and formats message.
+/* * Create Error: Captures location, traps debugger (if ZERROR_DEBUG), and formats message.
  * Usage: zerr_create(404, "User %d not found", uid); 
  */
 #define zerr_create(code, ...) \
@@ -129,14 +129,14 @@ DEFINE_RESULT(size_t,   ResSize)
 DEFINE_RESULT(void*,    ResPtr)
 DEFINE_RESULT(char*,    ResStr)
 
-/* --- Trace Logic --- */
-#ifdef Z_ENABLE_TRACE
+/* Trace Logic. */
+#ifdef ZERROR_ENABLE_TRACE
     #define Z_TRACE_OP(e) zerr_add_trace(e, __func__, __FILE__, __LINE__)
 #else
     #define Z_TRACE_OP(e) (e)
 #endif
 
-/* --- Macros & Flow Control --- */
+/* Macros and flow control. */
 
 #define Z_CHECK_SYS(expr, fmt, ...)                                     \
     do {                                                                \
@@ -261,7 +261,7 @@ DEFINE_RESULT(char*,    ResStr)
 #endif
 
 /* Short macros. */
-#ifdef Z_SHORT_ERR
+#ifdef ZERROR_SHORT_NAMES
     #define check(expr)             Z_CHECK(expr, #expr)
     #define check_into(T, expr)     Z_CHECK_INTO(T, expr, #expr)
     #define check_sys(expr, ...)    Z_CHECK_SYS(expr, __VA_ARGS__)
@@ -289,7 +289,7 @@ DEFINE_RESULT(char*,    ResStr)
 #ifdef ZERROR_IMPLEMENTATION
 
 /* Colors */
-#if defined(Z_NO_COLOR)
+#if defined(ZERROR_NO_COLOR)
     #define Z_COL_RED     ""
     #define Z_COL_YEL     ""
     #define Z_COL_GRY     ""
@@ -330,7 +330,7 @@ void zerr_panic(const char *msg, const char *file, int line)
     fprintf(stderr, "\n%s[PANIC]%s %s\n", Z_COL_BG_RED, Z_COL_RST, msg);
     fprintf(stderr, "        at %s:%d\n\n", file, line);
     Z_TRAP();
-    Z_PANIC_ACTION();
+    ZERROR_PANIC_ACTION();
 }
 
 zerr zerr_create_impl(int code, const char *file, int line, const char *func, const char *fmt, ...)
