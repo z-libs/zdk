@@ -657,7 +657,7 @@ static inline void zstr_trim(zstr *s)
 }
 
 // Replaces all occurrences of "target" with "replacement". 
-// This may reallocate the string if the size grows.
+// This MAY reallocate the string if the size grows.
 static inline int zstr_replace(zstr *s, const char *target, const char *replacement)
 {
     if (!target || !*target) return Z_ERR;
