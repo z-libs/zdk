@@ -1,6 +1,6 @@
 # Zen Development Kit (ZDK)  
 Official Style Guidelines and Coding Standard  
-Version 1.0.0 — December 2025  
+Version 1.1.0 — December 2025  
 https://github.com/z-libs
 
 ## Purpose of This Document
@@ -65,6 +65,13 @@ Libraries MAY optionally expose short aliases (`vec_push`, `map_get`, etc.) when
 - Blank line between top-level declarations.
 - No trailing whitespace.
 - Files MUST start and end with exactly one newline.
+- All preprocessor directives (`#if`, `#define`, `#include`, `#endif`, etc.) **MUST** start at column 1 (no leading whitespace).
+
+### 4.1 Preprocessor Directives
+
+- All `#if`, `#elif`, `#else`, `#endif`, `#include`, `#define`, etc. MUST begin at column 1.
+- Content inside such blocks is indented with exactly four spaces.
+- The only exception is when a directive appears inside a macro expansion that itself is indented, in which case the entire block may be uniformly indented.
 
 ## 5. Header Layout Standard
 
