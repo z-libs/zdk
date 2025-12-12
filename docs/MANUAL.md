@@ -1,6 +1,6 @@
 # Zen Development Kit (ZDK)  
 Official Style Guidelines and Coding Standard  
-Version 1.2.0 — December 2025  
+Version 1.2.1 — December 2025  
 https://github.com/z-libs
 
 ## Purpose of This Document
@@ -76,7 +76,7 @@ Pointer asterisks bind to the variable, not the type:
 - Allowed: `int *ptr`.
 - NOT allowed: `int* ptr`or `int * ptr`.
 
-## 4.3 Spacing Rules
+### 4.3 Spacing Rules
 
 - One space after keywords: `if (x)`, `while (n)`, `for (i = 0; ...)`.
 - No space between function name and parenthesis: `zvec_push(v, x)`.
