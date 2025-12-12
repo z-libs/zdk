@@ -1,0 +1,54 @@
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version Number (for example, 1.0.5)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build Debian Package
+        run: |
+          VERSION="${{ inputs.version }}"
+          mkdir -p package/DEBIAN
+          
+          # Generate Control File with user-provided version
+          echo "Package: zdk" > package/DEBIAN/control
+          echo "Version: $VERSION" >> package/DEBIAN/control
+          echo "Section: devel" >> package/DEBIAN/control
+          echo "Priority: optional" >> package/DEBIAN/control
+          echo "Architecture: all" >> package/DEBIAN/control
+          echo "Maintainer: Zuhaitz <zuhaitz.zechhub@gmail.com>" >> package/DEBIAN/control
+          echo "Description: The Z Development Kit (ZDK)" >> package/DEBIAN/control
+          echo " A collection of zero-dependency C libraries." >> package/DEBIAN/control
+
+          # Populate package directory
+          make install DESTDIR=package PREFIX=/usr
+
+          # Build the .deb file
+          FILENAME="zdk_${VERSION}_all.deb"
+          dpkg-deb --build package "$FILENAME"
+          
+          # Export filename to environment for the next step
+          echo "ASSET_PATH=$FILENAME" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Release v${{ inputs.version }}
+          files: ${{ env.ASSET_PATH }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
