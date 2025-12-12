@@ -1,7 +1,7 @@
 PROJECT = zdk
 HEADERS = zalloc.h zerror.h zlist.h zmap.h zmath.h zops.h zrand.h zstr.h zvec.h zworld.h
 
-# Install to /usr/local/include/zdk/
+# Install to /usr/include/zdk/ (Standard Linux path)
 PREFIX ?= /usr/local
 INCLUDEDIR ?= $(PREFIX)/include
 INSTALL_DIR = $(INCLUDEDIR)/$(PROJECT)
@@ -10,15 +10,11 @@ INSTALL_DIR = $(INCLUDEDIR)/$(PROJECT)
 
 all:
 	@echo "ZDK is a header-only library."
-	@echo "Run 'sudo make install' to install to $(INSTALL_DIR)"
+	@echo "Run 'sudo make install' to install."
 
 install:
-	@echo "Installing headers to $(INSTALL_DIR)..."
-	@mkdir -p $(INSTALL_DIR)
-	@cp $(HEADERS) $(INSTALL_DIR)
-	@echo "Done! Usage: #include <zdk/zworld.h>"
+	@mkdir -p $(DESTDIR)$(INSTALL_DIR)
+	@cp $(HEADERS) $(DESTDIR)$(INSTALL_DIR)
 
 uninstall:
-	@echo "Removing $(INSTALL_DIR)..."
-	@rm -rf $(INSTALL_DIR)
-	@echo "Done."
+	@rm -rf $(DESTDIR)$(INSTALL_DIR)

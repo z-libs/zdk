@@ -1,0 +1,11 @@
+Package: zdk
+Version: 1.0.0
+Section: devel
+Priority: optional
+Architecture: all
+Essential: no
+Maintainer: Zuhaitz <zuhaitz.zechhub@gmail.com>
+Description: The Z Development Kit (ZDK)
+ A collection of zero-dependency, header-only C libraries 
+ for robust system and game development.
+ Includes zvec, zmap, zmath, zerror, and more.

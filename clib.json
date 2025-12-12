@@ -1,0 +1,20 @@
+{
+  "name": "zdk",
+  "version": "1.0.0",
+  "repo": "z-libs/zdk",
+  "description": "The Z Development Kit - Zero dependency C extensions",
+  "keywords": ["C", "framework", "vector", "map", "math"],
+  "license": "MIT",
+  "src": [
+    "zworld.h",
+    "zalloc.h",
+    "zerror.h",
+    "zlist.h",
+    "zmap.h",
+    "zmath.h",
+    "zops.h",
+    "zrand.h",
+    "zstr.h",
+    "zvec.h"
+  ]
+}
