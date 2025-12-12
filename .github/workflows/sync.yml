@@ -1,0 +1,60 @@
+name: Sync ZDK
+
+on:
+  schedule:
+    - cron: '0 */12 * * *' # Run every 12 hours
+  workflow_dispatch:
+
+jobs:
+  update-libs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout ZDK
+        uses: actions/checkout@v4
+
+      - name: Download Headers
+        run: |
+          # The list of individual repos
+          libs=( "zvec" "zlist" "zmap" "zstr" "zalloc" "zops" "zerror" "zrand" "zmath" )
+          BASE_URL="https://raw.githubusercontent.com/z-libs"
+          
+          echo "Fetching latest headers..."
+          for lib in "${libs[@]}"; do
+            URL="$BASE_URL/$lib.h/main/$lib.h"
+            wget -q "$URL" -O "$lib.h"
+          done
+
+      - name: Generate zworld.h
+        run: |
+          echo "Generating zworld.h..."
+          echo "/* zworld.h - The Z-Libs Development Kit World */" > zworld.h
+          echo "/* Auto-generated. Do not edit. */" >> zworld.h
+          echo "" >> zworld.h
+          echo "#ifndef ZWORLD_H" >> zworld.h
+          echo "#define ZWORLD_H" >> zworld.h
+          echo "" >> zworld.h
+          
+          libs=( "zvec" "zlist" "zmap" "zstr" "zalloc" "zops" "zerror" "zrand" "zmath" )
+          for lib in "${libs[@]}"; do
+            echo "#include \"$lib.h\"" >> zworld.h
+          done
+          
+          echo "" >> zworld.h
+          echo "#endif // ZWORLD_H" >> zworld.h
+
+      - name: Commit Changes
+        run: |
+          git config user.name "zdk-bot"
+          git config user.email "bot@zlibs.org"
+          
+          if [[ -n $(git status --porcelain) ]]; then
+            git add *.h
+            git commit -m "chore(sync): update ZDK headers"
+            git push
+            echo "Updates pushed."
+          else
+            echo "No changes detected."
+          fi
