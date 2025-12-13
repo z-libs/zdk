@@ -15,6 +15,17 @@
 #ifndef Z_COMMON_BUNDLED
 #define Z_COMMON_BUNDLED
 
+
+/*
+ * zcommon.h — Common definitions for the Zen Development Kit (ZDK)
+ * Part of ZDK
+ *
+ * This header defines shared macros, error codes, and compiler extensions
+ * used across all ZDK libraries.
+ *
+ * License: MIT
+ */
+
 #ifndef ZCOMMON_H
 #define ZCOMMON_H
 
@@ -24,35 +35,58 @@
 #include <stdint.h>
 #include <string.h>
 
-// Return Codes.
-#define Z_OK     0
-#define Z_ERR   -1
-#define Z_FOUND  1
+// Return codes and error handling.
 
-// Memory Macros.
-// If the user hasn't defined their own allocator, use the standard one.
+// Success.
+#define Z_OK          0
+#define Z_FOUND       1   // Element found (positive).
+
+// Generic errors.
+#define Z_ERR        -1   // Generic error.
+
+// Resource errors.
+#define Z_ENOMEM     -2   // Out of memory (malloc/realloc failed).
+
+// Access errors.
+#define Z_EOOB       -3   // Out of bounds / range error.
+#define Z_EEMPTY     -4   // Container is empty.
+#define Z_ENOTFOUND  -5   // Element not found.
+
+// Logic errors.
+#define Z_EINVAL     -6   // Invalid argument / parameter.
+#define Z_EEXIST     -7   // Element already exists (for example, unique keys).
+
+// Memory management.
+
+/* * If the user hasn't defined their own allocator, use the standard C library.
+ * To override globally, define these macros before including any ZDK header.
+ */
 #ifndef Z_MALLOC
-    #include <stdlib.h>
-    #define Z_MALLOC(sz)       malloc(sz)
-    #define Z_CALLOC(n, sz)    calloc(n, sz)
-    #define Z_REALLOC(p, sz)   realloc(p, sz)
-    #define Z_FREE(p)          free(p)
+#   include <stdlib.h>
+#   define Z_MALLOC(sz)       malloc(sz)
+#   define Z_CALLOC(n, sz)    calloc(n, sz)
+#   define Z_REALLOC(p, sz)   realloc(p, sz)
+#   define Z_FREE(p)          free(p)
 #endif
 
-// Compiler Extensions (Optional).
-// We check for GCC/Clang features to enable RAII-style cleanup.
-// Define Z_NO_EXTENSIONS to disable this manually.
+
+// Compiler extensions and optimization.
+
+/* * We check for GCC/Clang features to enable RAII-style cleanup and optimization hints.
+ * Define Z_NO_EXTENSIONS to disable this manually.
+ */
 #if !defined(Z_NO_EXTENSIONS) && (defined(__GNUC__) || defined(__clang__))
         
 #   define Z_HAS_CLEANUP 1
     
-    // RAII Cleanup (destructors).
+    // RAII cleanup (destructors).
+    // Usage: zvec_autofree(Int) v = zvec_init(Int);
 #   define Z_CLEANUP(func) __attribute__((cleanup(func)))
     
-    // Warn if the return value (for example, an Error Result) is ignored.
-    #define Z_NODISCARD     __attribute__((warn_unused_result))
+    // Warn if the return value (e.g., an Error Result) is ignored.
+#   define Z_NODISCARD     __attribute__((warn_unused_result))
     
-    // Branch prediction hints.
+    // Branch prediction hints for the compiler.
 #   define Z_LIKELY(x)     __builtin_expect(!!(x), 1)
 #   define Z_UNLIKELY(x)   __builtin_expect(!!(x), 0)
 
@@ -66,35 +100,40 @@
 
 #endif
 
-// Metaprogramming Markers.
-// These macros are used by the Z-Scanner tool to find type definitions.
-// For the C compiler, they are no-ops (they compile to nothing).
+
+// Metaprogramming and internal utils.
+
+/* * Markers for the Z-Scanner tool to find type definitions.
+ * For the C compiler, they are no-ops (they compile to nothing).
+ */
 #define DEFINE_VEC_TYPE(T, Name)
 #define DEFINE_LIST_TYPE(T, Name)
 #define DEFINE_MAP_TYPE(Key, Val, Name)
 #define DEFINE_STABLE_MAP_TYPE(Key, Val, Name)
 
-// Token concatenation macros (useful for unique variable names in defer)
+// Token concatenation macros (useful for unique variable names in macros).
 #define Z_CONCAT_(a, b) a ## b
 #define Z_CONCAT(a, b) Z_CONCAT_(a, b)
 #define Z_UNIQUE(prefix) Z_CONCAT(prefix, __LINE__)
 
-// Growth Strategy.
-// Determines how containers expand when full.
-// Default is 2.0x (Geometric Growth).
-//
-// Optimization Note:
-// 2.0x minimizes realloc calls but can waste memory.
-// 1.5x is often better for memory fragmentation and reuse.
+// Growth strategy.
+
+/* * Determines how containers expand when full.
+ * Default is 2.0x (Geometric Growth).
+ *
+ * Optimization note:
+ * 2.0x minimizes realloc calls but can waste memory.
+ * 1.5x is often better for memory fragmentation and reuse.
+ */
 #ifndef Z_GROWTH_FACTOR
-    // Default: Double capacity (2.0x)
-    #define Z_GROWTH_FACTOR(cap) ((cap) == 0 ? 32 : (cap) * 2)
+    // Default: Double capacity (2.0x).
+#   define Z_GROWTH_FACTOR(cap) ((cap) == 0 ? 32 : (cap) * 2)
     
-    // Alternative: 1.5x Growth (Uncomment to use)
+    // Alternative: 1.5x Growth (Uncomment to use in your project).
     // #define Z_GROWTH_FACTOR(cap) ((cap) == 0 ? 32 : (cap) + (cap) / 2)
 #endif
 
-#endif
+#endif // ZCOMMON_H
 
 
 #endif // Z_COMMON_BUNDLED
@@ -110,16 +149,16 @@
  * with zero-cost abstraction.
  *
  * Features:
- *   • C11 _Generic interface (zvec_push(v, x))
- *   • Full RAII C++ wrapper in namespace z_vec::vector<T>
- *   • Fast path (asserts + int error codes) and safe path (zres<T>)
- *   • Optional short names via ZVEC_SHORT_NAMES
- *   • Automatic type registration via z_registry.h or manual DEFINE_ macros
+ * • C11 _Generic interface (zvec_push(v, x))
+ * • Full RAII C++ wrapper in namespace z_vec::vector<T>
+ * • Fast path (asserts + int error codes) and safe path (zres<T>)
+ * • Optional short names via ZVEC_SHORT_NAMES
+ * • Automatic type registration via z_registry.h or manual DEFINE_ macros
  *
  * License: MIT
  * Author: Zuhaitz
  * Repository: https://github.com/z-libs/zvec
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
 #ifndef ZVEC_H
@@ -307,7 +346,10 @@ namespace z_vec
 
         void push_back(const T &val)
         { 
-            Traits::push(inner, val); 
+            if (Z_OK != Traits::push(inner, val))
+            {
+                throw std::bad_alloc();
+            }
         }
 
         void pop_back()
@@ -322,7 +364,10 @@ namespace z_vec
         
         void reserve(size_t cap)
         {
-            Traits::reserve(inner, cap);
+            if (Z_OK != Traits::reserve(inner, cap))
+            {
+                throw std::bad_alloc();
+            }
         }
 
         void shrink_to_fit()
@@ -393,7 +438,7 @@ extern "C" {
  * Safe API generation (requires zerror.h).
  *
  * When Z_HAS_ZERROR is true, each generated vector type gets safe variants:
- *   zvec_push_safe_*, zvec_reserve_safe_*, zvec_pop_safe_*, etc.
+ * zvec_push_safe_*, zvec_reserve_safe_*, zvec_pop_safe_*, etc.
  * These return zres/zresult<T> and include file/line/function context.
  */
 #if Z_HAS_ZERROR
@@ -416,7 +461,7 @@ extern "C" {
                 T *new_data = (T *)ZVEC_REALLOC(v->data, new_cap * sizeof(T));                  \
                 if (!new_data)                                                                  \
                 {                                                                               \
-                    return zres_err(zvec_err_impl(Z_ERR, "Vector Push OOM", f, l, fn));         \
+                    return zres_err(zvec_err_impl(Z_ENOMEM, "Vector Push OOM", f, l, fn));      \
                 }                                                                               \
                 v->data = new_data;                                                             \
                 v->capacity = new_cap;                                                          \
@@ -435,7 +480,7 @@ extern "C" {
             T *new_data = (T *)ZVEC_REALLOC(v->data, cap * sizeof(T));                          \
             if (!new_data)                                                                      \
             {                                                                                   \
-                return zres_err(zvec_err_impl(Z_ERR, "Vector Reserve OOM", f, l, fn));          \
+                return zres_err(zvec_err_impl(Z_ENOMEM, "Vector Reserve OOM", f, l, fn));       \
             }                                                                                   \
             v->data = new_data;                                                                 \
             v->capacity = cap;                                                                  \
@@ -447,7 +492,7 @@ extern "C" {
         {                                                                                       \
             if (0 == v->length)                                                                 \
             {                                                                                   \
-                return Res_##Name##_err(zvec_err_impl(Z_ERR, "Pop empty vec", f, l, fn));       \
+                return Res_##Name##_err(zvec_err_impl(Z_EEMPTY, "Pop empty vec", f, l, fn));    \
             }                                                                                   \
             return Res_##Name##_ok(v->data[--v->length]);                                       \
         }                                                                                       \
@@ -457,7 +502,7 @@ extern "C" {
         {                                                                                       \
             if (i >= v->length)                                                                 \
             {                                                                                   \
-                return Res_##Name##_err(zvec_err_impl(Z_ERR, "Index out of bounds", f, l, fn)); \
+                return Res_##Name##_err(zvec_err_impl(Z_EOOB, "Index out of bounds", f, l, fn));\
             }                                                                                   \
             return Res_##Name##_ok(v->data[i]);                                                 \
         }                                                                                       \
@@ -467,7 +512,7 @@ extern "C" {
         {                                                                                       \
             if (0 == v->length)                                                                 \
             {                                                                                   \
-                return Res_##Name##_err(zvec_err_impl(Z_ERR, "Vector is empty", f, l, fn));     \
+                return Res_##Name##_err(zvec_err_impl(Z_EEMPTY, "Vector is empty", f, l, fn));  \
             }                                                                                   \
             return Res_##Name##_ok(v->data[v->length - 1]);                                     \
         }
@@ -482,19 +527,19 @@ extern "C" {
  * Primary generation macro.
  *
  * Use manually via:
- *   #define REGISTER_ZVEC_TYPES(X) \
- *       X(int,   Int)   \
- *       X(float, Float) \
- *       X(MyType, MyType)
- *   #include "zvec.h"
+ * #define REGISTER_ZVEC_TYPES(X)   \
+ *      X(int, Int)                 \
+ *      X(float, Float)             \
+ *      X(MyType, MyType)
+ * #include "zvec.h"
  *
  * This creates:
- *   • struct zvec_Int / zvec_Float, etc.
- *   • All functions: zvec_push_Int, zvec_reserve_Float, etc.
- *   • Full _Generic dispatch.
- *   • C++ traits specialization for z_vec::vector<T>
+ * • struct zvec_Int / zvec_Float, etc.
+ * • All functions: zvec_push_Int, zvec_reserve_Float, etc.
+ * • Full _Generic dispatch.
+ * • C++ traits specialization for z_vec::vector<T>
  *
- * Fast path: returns int (Z_OK / Z_ERR), asserts on logic errors.
+ * Fast path: returns int (Z_OK / Z_ENOMEM), asserts on logic errors.
  * Safe path (when zerror.h present): returns zres / zresult<T>.
  */
 #define ZVEC_GENERATE_IMPL(T, Name)                                                         \
@@ -507,8 +552,6 @@ extern "C" {
         size_t length;                                                                      \
         size_t capacity;                                                                    \
     } zvec_##Name;                                                                          \
-                                                                                            \
-    ZVEC_GEN_SAFE_IMPL(T, Name)                                                             \
                                                                                             \
     static inline zvec_##Name zvec_init_capacity_##Name(size_t cap)                         \
     {                                                                                       \
@@ -542,7 +585,7 @@ extern "C" {
         T *new_data = (T *)ZVEC_REALLOC(v->data, new_cap * sizeof(T));                      \
         if (!new_data)                                                                      \
         {                                                                                   \
-            return Z_ERR;                                                                   \
+            return Z_ENOMEM;                                                                \
         }                                                                                   \
         v->data = new_data;                                                                 \
         v->capacity = new_cap;                                                              \
@@ -572,7 +615,7 @@ extern "C" {
         T *slot = zvec_push_slot_##Name(v);                                                 \
         if (!slot)                                                                          \
         {                                                                                   \
-            return Z_ERR;                                                                   \
+            return Z_ENOMEM;                                                                \
         }                                                                                   \
         *slot = value;                                                                      \
         return Z_OK;                                                                        \
@@ -589,7 +632,7 @@ extern "C" {
             }                                                                               \
             if (Z_OK != zvec_reserve_##Name(v, new_cap))                                    \
             {                                                                               \
-                return Z_ERR;                                                               \
+                return Z_ENOMEM;                                                            \
             }                                                                               \
         }                                                                                   \
         memcpy(v->data + v->length, items, count * sizeof(T));                              \
@@ -726,7 +769,10 @@ extern "C" {
             }                                                                               \
         }                                                                                   \
         return (l < v->length) ? &v->data[l] : NULL;                                        \
-    }
+    }                                                                                       \
+                                                                                            \
+    /* Inject safe API. */                                                                  \
+    ZVEC_GEN_SAFE_IMPL(T, Name)
 
 // Dispatch table entries for _Generic.
 #define PUSH_ENTRY(T, Name)         zvec_##Name *: zvec_push_##Name,
@@ -819,7 +865,10 @@ Z_ALL_VECS(ZVEC_GENERATE_IMPL)
 
 // Safe API dispatch (zerror.h required).
 #if Z_HAS_ZERROR
-    static inline zres zres_err_dummy(void *v, ...) { return zres_err(zerr_create(-1, "Unknown vector type")); }
+    static inline zres zres_err_dummy(void *v, ...) 
+    { 
+        return zres_err(zerr_create(-1, "Unknown vector type")); 
+    }
 
 #   define zvec_reserve_safe(v, cap) \
         _Generic((v), Z_ALL_VECS(RESERVE_SAFE_ENTRY) default: zres_err_dummy)(v, cap, __FILE__, __LINE__, __func__)
@@ -897,19 +946,19 @@ namespace z_vec
                 ::zvec_free_##Name(&v);                                     \
             }                                                               \
                                                                             \
-            static inline void push(c_type &v, T val)                       \
+            static inline int push(c_type &v, T val)                        \
             {                                                               \
-                ::zvec_push_##Name(&v, val);                                \
+                return ::zvec_push_##Name(&v, val);                         \
             }                                                               \
                                                                             \
-            static inline void extend(c_type &v, const T *arr, size_t n)    \
+            static inline int extend(c_type &v, const T *arr, size_t n)     \
             {                                                               \
-                ::zvec_extend_##Name(&v, arr, n);                           \
+                return ::zvec_extend_##Name(&v, arr, n);                    \
             }                                                               \
                                                                             \
-            static inline void reserve(c_type &v, size_t n)                 \
+            static inline int reserve(c_type &v, size_t n)                  \
             {                                                               \
-                ::zvec_reserve_##Name(&v, n);                               \
+                return ::zvec_reserve_##Name(&v, n);                        \
             }                                                               \
                                                                             \
             static inline void pop(c_type &v)                               \

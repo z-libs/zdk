@@ -165,41 +165,41 @@ DEFINE_RESULT(char*,    ResStr)
         }                                                       \
     } while(0)
 
-#define Z_CHECK_WRAP(expr, fmt, ...)                                        \
+#define Z_CHECK_WRAP(expr, src, fmt, ...)                                   \
     do {                                                                    \
         Z_TYPEOF(expr) Z_UID(_r) = (expr);                                  \
         if (!Z_UID(_r).is_ok) {                                             \
-            Z_UID(_r).err = zerr_with_src(Z_UID(_r).err, #expr);\
+            Z_UID(_r).err = zerr_with_src(Z_UID(_r).err, src);              \
             Z_UID(_r).err = Z_TRACE_OP(Z_UID(_r).err);                      \
             return zres_err(zerr_wrap(Z_UID(_r).err, fmt, ##__VA_ARGS__));  \
         }                                                                   \
     } while(0)
 
-#define Z_CHECK_CTX(expr, fmt, ...)                                         \
+#define Z_CHECK_CTX(expr, src, fmt, ...)                                    \
     do {                                                                    \
         Z_TYPEOF(expr) Z_UID(_r) = (expr);                                  \
         if (!Z_UID(_r).is_ok) {                                             \
-            Z_UID(_r).err = zerr_with_src(Z_UID(_r).err, #expr);            \
+            Z_UID(_r).err = zerr_with_src(Z_UID(_r).err, src);              \
             Z_UID(_r).err = Z_TRACE_OP(Z_UID(_r).err);                      \
             Z_UID(_r).err = zerr_wrap(Z_UID(_r).err, fmt, ##__VA_ARGS__);   \
             return zres_err(Z_UID(_r).err);                                 \
         }                                                                   \
     } while(0)
 
-#define Z_ENSURE(cond, code, msg)                               \
+#define Z_ENSURE(cond, src, code, msg)                          \
     do {                                                        \
         if (!(cond)) {                                          \
             zerr _e = zerr_create((code), (msg));               \
-            _e.source = #cond;                                  \
+            _e.source = src;                                    \
             return zres_err(_e);                                \
         }                                                       \
     } while(0)
 
-#define Z_ENSURE_INTO(RetType, cond, code, msg)                 \
+#define Z_ENSURE_INTO(RetType, cond, src, code, msg)            \
     do {                                                        \
         if (!(cond)) {                                          \
             zerr _e = zerr_create((code), (msg));               \
-            _e.source = #cond;                                  \
+            _e.source = src;                                    \
             return RetType##_err(_e);                           \
         }                                                       \
     } while(0)
@@ -226,11 +226,11 @@ DEFINE_RESULT(char*,    ResStr)
             Z_UID(_res).val;                                            \
         })
 
-    #define Z_TRY_PTR(RetType, expr, code, msg)                     \
+    #define Z_TRY_PTR(RetType, expr, src, code, msg)                \
         ({  Z_TYPEOF(expr) Z_UID(_p) = (expr);                      \
             if (Z_UID(_p) == NULL) {                                \
                 zerr _e = zerr_create((code), (msg));               \
-                _e.source = #expr;                                  \
+                _e.source = src;                                    \
                 return RetType##_err(_e);                           \
             }                                                       \
             Z_UID(_p);                                              \
@@ -265,16 +265,16 @@ DEFINE_RESULT(char*,    ResStr)
     #define check(expr)             Z_CHECK(expr, #expr)
     #define check_into(T, expr)     Z_CHECK_INTO(T, expr, #expr)
     #define check_sys(expr, ...)    Z_CHECK_SYS(expr, __VA_ARGS__)
-    #define check_wrap(expr, ...)   Z_CHECK_WRAP(expr, __VA_ARGS__)
-    #define check_ctx(expr, ...)    Z_CHECK_CTX(expr, __VA_ARGS__)
+    #define check_wrap(expr, ...)   Z_CHECK_WRAP(expr, #expr, __VA_ARGS__)
+    #define check_ctx(expr, ...)    Z_CHECK_CTX(expr, #expr, __VA_ARGS__)
     
-    #define ensure(c, code, m)          Z_ENSURE(c, code, m)
-    #define ensure_into(T, c, code, m)  Z_ENSURE_INTO(T, c, code, m)
+    #define ensure(c, code, m)          Z_ENSURE(c, #c, code, m)
+    #define ensure_into(T, c, code, m)  Z_ENSURE_INTO(T, c, #c, code, m)
 
     #if Z_HAS_MODERN_C
         #define try(expr)               Z_TRY(expr, #expr)
         #define try_into(T, expr)       Z_TRY_INTO(T, expr, #expr)
-        #define try_ptr(T, p, c, m)     Z_TRY_PTR(T, p, c, m)
+        #define try_ptr(T, p, c, m)     Z_TRY_PTR(T, p, #p, c, m)
         #define try_or(e, d)            Z_TRY_OR(e, d)
 
         #define unwrap(e)               Z_EXPECT(e, "unwrap() failed")
@@ -407,5 +407,5 @@ zerr zerr_wrap(zerr e, const char *fmt, ...)
 #endif // ZERROR_IMPLEMENTATION 
 #ifdef __cplusplus
 }
-#endif // ZERROR_H
 #endif
+#endif // ZERROR_H
