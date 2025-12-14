@@ -15,6 +15,17 @@
 #ifndef Z_COMMON_BUNDLED
 #define Z_COMMON_BUNDLED
 
+
+/*
+ * zcommon.h — Common definitions for the Zen Development Kit (ZDK)
+ * Part of ZDK
+ *
+ * This header defines shared macros, error codes, and compiler extensions
+ * used across all ZDK libraries.
+ *
+ * License: MIT
+ */
+
 #ifndef ZCOMMON_H
 #define ZCOMMON_H
 
@@ -24,35 +35,58 @@
 #include <stdint.h>
 #include <string.h>
 
-// Return Codes.
-#define Z_OK     0
-#define Z_ERR   -1
-#define Z_FOUND  1
+// Return codes and error handling.
 
-// Memory Macros.
-// If the user hasn't defined their own allocator, use the standard one.
+// Success.
+#define Z_OK          0
+#define Z_FOUND       1   // Element found (positive).
+
+// Generic errors.
+#define Z_ERR        -1   // Generic error.
+
+// Resource errors.
+#define Z_ENOMEM     -2   // Out of memory (malloc/realloc failed).
+
+// Access errors.
+#define Z_EOOB       -3   // Out of bounds / range error.
+#define Z_EEMPTY     -4   // Container is empty.
+#define Z_ENOTFOUND  -5   // Element not found.
+
+// Logic errors.
+#define Z_EINVAL     -6   // Invalid argument / parameter.
+#define Z_EEXIST     -7   // Element already exists (for example, unique keys).
+
+// Memory management.
+
+/* * If the user hasn't defined their own allocator, use the standard C library.
+ * To override globally, define these macros before including any ZDK header.
+ */
 #ifndef Z_MALLOC
-    #include <stdlib.h>
-    #define Z_MALLOC(sz)       malloc(sz)
-    #define Z_CALLOC(n, sz)    calloc(n, sz)
-    #define Z_REALLOC(p, sz)   realloc(p, sz)
-    #define Z_FREE(p)          free(p)
+#   include <stdlib.h>
+#   define Z_MALLOC(sz)       malloc(sz)
+#   define Z_CALLOC(n, sz)    calloc(n, sz)
+#   define Z_REALLOC(p, sz)   realloc(p, sz)
+#   define Z_FREE(p)          free(p)
 #endif
 
-// Compiler Extensions (Optional).
-// We check for GCC/Clang features to enable RAII-style cleanup.
-// Define Z_NO_EXTENSIONS to disable this manually.
+
+// Compiler extensions and optimization.
+
+/* * We check for GCC/Clang features to enable RAII-style cleanup and optimization hints.
+ * Define Z_NO_EXTENSIONS to disable this manually.
+ */
 #if !defined(Z_NO_EXTENSIONS) && (defined(__GNUC__) || defined(__clang__))
         
 #   define Z_HAS_CLEANUP 1
     
-    // RAII Cleanup (destructors).
+    // RAII cleanup (destructors).
+    // Usage: zvec_autofree(Int) v = zvec_init(Int);
 #   define Z_CLEANUP(func) __attribute__((cleanup(func)))
     
-    // Warn if the return value (for example, an Error Result) is ignored.
-    #define Z_NODISCARD     __attribute__((warn_unused_result))
+    // Warn if the return value (e.g., an Error Result) is ignored.
+#   define Z_NODISCARD     __attribute__((warn_unused_result))
     
-    // Branch prediction hints.
+    // Branch prediction hints for the compiler.
 #   define Z_LIKELY(x)     __builtin_expect(!!(x), 1)
 #   define Z_UNLIKELY(x)   __builtin_expect(!!(x), 0)
 
@@ -66,39 +100,67 @@
 
 #endif
 
-// Metaprogramming Markers.
-// These macros are used by the Z-Scanner tool to find type definitions.
-// For the C compiler, they are no-ops (they compile to nothing).
+
+// Metaprogramming and internal utils.
+
+/* * Markers for the Z-Scanner tool to find type definitions.
+ * For the C compiler, they are no-ops (they compile to nothing).
+ */
 #define DEFINE_VEC_TYPE(T, Name)
 #define DEFINE_LIST_TYPE(T, Name)
 #define DEFINE_MAP_TYPE(Key, Val, Name)
 #define DEFINE_STABLE_MAP_TYPE(Key, Val, Name)
 
-// Token concatenation macros (useful for unique variable names in defer)
+// Token concatenation macros (useful for unique variable names in macros).
 #define Z_CONCAT_(a, b) a ## b
 #define Z_CONCAT(a, b) Z_CONCAT_(a, b)
 #define Z_UNIQUE(prefix) Z_CONCAT(prefix, __LINE__)
 
-// Growth Strategy.
-// Determines how containers expand when full.
-// Default is 2.0x (Geometric Growth).
-//
-// Optimization Note:
-// 2.0x minimizes realloc calls but can waste memory.
-// 1.5x is often better for memory fragmentation and reuse.
+// Growth strategy.
+
+/* * Determines how containers expand when full.
+ * Default is 2.0x (Geometric Growth).
+ *
+ * Optimization note:
+ * 2.0x minimizes realloc calls but can waste memory.
+ * 1.5x is often better for memory fragmentation and reuse.
+ */
 #ifndef Z_GROWTH_FACTOR
-    // Default: Double capacity (2.0x)
-    #define Z_GROWTH_FACTOR(cap) ((cap) == 0 ? 32 : (cap) * 2)
+    // Default: Double capacity (2.0x).
+#   define Z_GROWTH_FACTOR(cap) ((cap) == 0 ? 32 : (cap) * 2)
     
-    // Alternative: 1.5x Growth (Uncomment to use)
+    // Alternative: 1.5x Growth (Uncomment to use in your project).
     // #define Z_GROWTH_FACTOR(cap) ((cap) == 0 ? 32 : (cap) + (cap) / 2)
 #endif
 
-#endif
+#endif // ZCOMMON_H
 
 
 #endif // Z_COMMON_BUNDLED
 /* ============================================================================ */
+
+
+/*
+ * zmap.h — Type-safe, zero-overhead hash map
+ * Part of Zen Development Kit (ZDK)
+ *
+ * This is a macro-generated, single-header hash map library.
+ * It produces fully type-safe map implementations at compile time using
+ * Robin Hood hashing with backward shift deletion.
+ *
+ * Features:
+ * • Open addressing with Robin Hood hashing (high load factors)
+ * • Two storage modes:
+ * 1. Standard: Keys/Values stored inline (fastest, cache-friendly)
+ * 2. Stable: Values stored via pointer (stable addresses, like std::map)
+ * • C++ z_map::map<K,V> with RAII and STL-compatible iterators
+ * • Optional short names via ZMAP_SHORT_NAMES
+ *
+ * License: MIT
+ * Author: Zuhaitz
+ * Repository: https://github.com/z-libs/zmap
+ * Version: 1.0.0
+ */
 
 #ifndef ZMAP_H
 #define ZMAP_H
@@ -107,6 +169,25 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#if defined(__has_include) && __has_include("zerror.h")
+#   include "zerror.h"
+#   define Z_HAS_ZERROR 1
+#elif defined(ZERROR_H)
+#   define Z_HAS_ZERROR 1
+#else
+#   define Z_HAS_ZERROR 0
+#endif
+
+/* * Shared Enum: Defined here so both C++ and C sections can see it.
+ */
+typedef enum
+{
+    ZMAP_EMPTY = 0,
+    ZMAP_OCCUPIED
+} zmap_state;
+
+
+// C++ interop preamble.
 #ifdef __cplusplus
 #include <stdexcept>
 #include <iterator>
@@ -115,28 +196,24 @@
 
 namespace z_map
 {
-    /* Forward declarations. */
+    // Forward declarations.
     template <typename K, typename V> struct map;
     template <typename K, typename V> class map_iterator;
 
-    /* Base traits struct (specialized by macros later). */
+    // Base traits struct (specialized by macros later).
     template <typename K, typename V>
     struct traits
     {
-        static_assert(sizeof(K) == 0, "No zmap implementation registered for this key/value pair.");
+        static_assert(0 == sizeof(K), "No zmap implementation registered for this key/value pair.");
     };
 
-    /* * Forward iterator for the map.
-     * Iterates over buckets, skipping EMPTY states.
-     */
+    // Forward iterator for the map.
     template <typename K, typename V>
     class map_iterator
     {
     public:
-        // Detect const-ness for correct iterator_traits.
         static constexpr bool is_const = std::is_const<K>::value || std::is_const<V>::value;
 
-        // Strip const for trait lookup (we always look up the raw C type).
         using KeyT = typename std::remove_const<K>::type;
         using ValT = typename std::remove_const<V>::type;
         
@@ -148,35 +225,41 @@ namespace z_map
         using value_type = CBucket;
         using difference_type = ptrdiff_t;
         
-        // Handle const references/pointers dynamically.
         using reference = typename std::conditional<is_const, const CBucket&, CBucket&>::type;
         using pointer   = typename std::conditional<is_const, const CBucket*, CBucket*>::type;
 
         map_iterator(CMap* m, size_t idx) : map_ptr(m), index(idx) 
         {
-            // Scan to first valid item.
             if (map_ptr && index < map_ptr->capacity) 
             {
-                if (map_ptr->buckets[index].state == 0) // 0 is ZMAP_EMPTY
+                if (map_ptr->buckets[index].state == ZMAP_EMPTY)
                 {
                     advance();
                 }
             }
         }
 
-        reference operator*() const { return map_ptr->buckets[index]; }
-        pointer operator->() const { return &map_ptr->buckets[index]; }
+        reference operator*() const 
+        { 
+            return map_ptr->buckets[index]; 
+        }
 
-GeneraCan you        bool operator==(const map_iterator& other) const 
+        pointer operator->() const 
+        { 
+            return &map_ptr->buckets[index]; 
+        }
+
+        bool operator==(const map_iterator &other) const 
         { 
             return map_ptr == other.map_ptr && index == other.index; 
         }
-        bool operator!=(const map_iterator& other) const 
+
+        bool operator!=(const map_iterator &other) const 
         { 
             return !(*this == other); 
         }
 
-        map_iterator& operator++() 
+        map_iterator &operator++() 
         {
             if (index < map_ptr->capacity) 
             {
@@ -202,7 +285,7 @@ GeneraCan you        bool operator==(const map_iterator& other) const
             }
         }
 
-        CMap* map_ptr;
+        CMap *map_ptr;
         size_t index;
     };
 
@@ -211,8 +294,7 @@ GeneraCan you        bool operator==(const map_iterator& other) const
     {
         using Traits = traits<K, V>;
         using c_map = typename Traits::map_type;
-        using c_bucket = typename Traits::bucket_type;
-
+        
         using iterator = map_iterator<K, V>;
         using const_iterator = map_iterator<const K, const V>;
 
@@ -221,123 +303,171 @@ GeneraCan you        bool operator==(const map_iterator& other) const
         using HashFunc = uint32_t (*)(K, uint32_t);
         using CmpFunc = int (*)(K, K);
 
-        // Constructor.
         map(HashFunc h, CmpFunc c, uint32_t seed = 0xCAFEBABE, float load_factor = 0.85f) 
             : inner(Traits::init(h, c, load_factor)) 
         {
             Traits::set_seed(&inner, seed);
         }
 
-        // Move constructor.
-        map(map&& other) noexcept : inner(other.inner) 
+        map(map &&other) noexcept : inner(other.inner) 
         {
-            other.inner = (c_map){0};
+            other.inner = Traits::init(inner.hash_func, inner.cmp_func, inner.load_factor);
         }
 
-        // Destructor.
-        ~map() { Traits::free(&inner); }
+        ~map() 
+        { 
+            Traits::free(&inner); 
+        }
 
-        // Move assignment.
-        map& operator=(map&& other) noexcept 
+        map &operator=(map &&other) noexcept 
         {
             if (this != &other) 
             {
                 Traits::free(&inner);
                 inner = other.inner;
-                other.inner = (c_map){0};
+                other.inner = Traits::init(inner.hash_func, inner.cmp_func, inner.load_factor);
             }
             return *this;
         }
 
-        // Deleted copy (maps are heavy yk bruh).
         map(const map&) = delete;
-        map& operator=(const map&) = delete;
+        map &operator=(const map&) = delete;
 
-        /* Modifiers. */
-
-        void put(const K& key, const V& val) 
+        void put(const K &key, const V &val) 
         {
-            if (Traits::put(&inner, key, val) != 0) 
+            if (Z_OK != Traits::put(&inner, key, val)) 
             {
-                // In embedded/no-exception environments, this logic would need adaption...
                 throw std::bad_alloc();
             }
         }
 
-        void insert_or_assign(const K& key, const V& val) { put(key, val); }
+        void insert_or_assign(const K &key, const V &val) 
+        {
+            put(key, val);
+        }
 
-        V* get(const K& key) { return Traits::get(&inner, key); }
-        const V* get(const K& key) const { return Traits::get((c_map*)&inner, key); }
+        V *get(const K &key) 
+        { 
+            return Traits::get(&inner, key); 
+        }
 
-        bool contains(const K& key) const { return Traits::get((c_map*)&inner, key) != NULL; }
+        const V *get(const K &key) const 
+        { 
+            return Traits::get((c_map*)&inner, key); 
+        }
 
-        void erase(const K& key) { Traits::remove(&inner, key); }
+        bool contains(const K &key) const 
+        { 
+            return NULL != Traits::get((c_map*)&inner, key); 
+        }
 
-        void clear() { Traits::clear(&inner); }
+        V &operator[](const K &key)
+        {
+            V *ptr = get(key);
+            if (!ptr)
+            {
+                put(key, V{});
+                ptr = get(key);
+            }
+            return *ptr;
+        }
+
+        V &at(const K &key)
+        {
+            V *ptr = get(key);
+            if (!ptr) 
+            {
+                throw std::out_of_range("z_map::map::at");
+            }
+            return *ptr;
+        }
+
+        void erase(const K &key) 
+        { 
+            Traits::remove(&inner, key); 
+        }
+
+        void clear() 
+        { 
+            Traits::clear(&inner); 
+        }
         
-        void set_seed(uint32_t seed) { Traits::set_seed(&inner, seed); }
+        size_t size() const 
+        { 
+            return inner.count; 
+        }
 
-        /* Capacity. */
-        size_t size() const { return inner.count; }
-        bool empty() const { return inner.count == 0; }
+        bool empty() const 
+        { 
+            return 0 == inner.count; 
+        }
 
-        /* Iterators. */
-        iterator begin() { return iterator(&inner, 0); }
-        iterator end() { return iterator(&inner, inner.capacity); }
-        
-        const_iterator begin() const { return const_iterator((c_map*)&inner, 0); }
-        const_iterator end() const { return const_iterator((c_map*)&inner, inner.capacity); }
-        const_iterator cbegin() const { return begin(); }
-        const_iterator cend() const { return end(); }
+        iterator begin() 
+        { 
+            return iterator(&inner, 0); 
+        }
+
+        iterator end() 
+        { 
+            return iterator(&inner, inner.capacity); 
+        }
+
+        const_iterator begin() const 
+        { 
+            return const_iterator((c_map*)&inner, 0); 
+        }
+
+        const_iterator end() const 
+        { 
+            return const_iterator((c_map *)&inner, inner.capacity); 
+        }
     };
 }
-
 extern "C" {
 #endif // __cplusplus
 
-/* Configuration and allocators. */
+// Configuration and allocators.
 
-#ifndef Z_MAP_MALLOC
-    #define Z_MAP_MALLOC(sz)      Z_MALLOC(sz)
+#ifndef ZMAP_MALLOC
+#   define ZMAP_MALLOC(sz)      Z_MALLOC(sz)
 #endif
 
-#ifndef Z_MAP_CALLOC
-    #define Z_MAP_CALLOC(n, sz)   Z_CALLOC(n, sz)
+#ifndef ZMAP_CALLOC
+#   define ZMAP_CALLOC(n, sz)   Z_CALLOC(n, sz)
 #endif
 
-#ifndef Z_MAP_REALLOC
-    #define Z_MAP_REALLOC(p, sz)  Z_REALLOC(p, sz)
+#ifndef ZMAP_REALLOC
+#   define ZMAP_REALLOC(p, sz)  Z_REALLOC(p, sz)
 #endif
 
-#ifndef Z_MAP_FREE
-    #define Z_MAP_FREE(p)         Z_FREE(p)
+#ifndef ZMAP_FREE
+#   define ZMAP_FREE(p)         Z_FREE(p)
 #endif
 
-/* Load factor configuration. */
+// Load factor configuration.
 #define ZMAP_DEFAULT_LOAD 0.85f
 
-/* Hashing strategy and helpers */
-
+// Hashing helpers.
 #if defined(__has_include) && __has_include("zhash.h")
-    #include "zhash.h"
-    #define ZMAP_HAS_ZHASH 1
+#   include "zhash.h"
+#   define ZMAP_HAS_ZHASH 1
 #elif defined(ZHASH_H)
-    #define ZMAP_HAS_ZHASH 1
+#   define ZMAP_HAS_ZHASH 1
 #else
-    #define ZMAP_HAS_ZHASH 0
+#   define ZMAP_HAS_ZHASH 0
 #endif
 
 #ifndef ZMAP_HASH_FUNC
-    #if ZMAP_HAS_ZHASH
-        /* Use WyHash. */
-        #define ZMAP_HASH_FUNC(key, len, seed) zhash_fast(key, len, seed)
-    #else
-        /* FNV-1a. */
+#   if ZMAP_HAS_ZHASH
+#       define ZMAP_HASH_FUNC(key, len, seed) zhash_fast(key, len, seed)
+#   else
+        // FNV-1a inline fallback.
         static inline uint32_t zmap_default_hash(const void *key, size_t len, uint32_t seed) 
         {
             uint32_t hash = 2166136261u ^ seed;
             const uint8_t *data = (const uint8_t *)key;
-            for (size_t i = 0; i < len; i++) {
+            for (size_t i = 0; i < len; i++) 
+            {
                 hash ^= data[i];
                 hash *= 16777619;
             }
@@ -352,16 +482,18 @@ extern "C" {
 
 static inline size_t zmap_next_pow2(size_t n) 
 {
-    if (n == 0) return 16;
+    if (0 == n) 
+    {
+        return 16;
+    }
     n--;
     n |= n >> 1; n |= n >> 2; n |= n >> 4; n |= n >> 8; n |= n >> 16;
-    #if UINTPTR_MAX > 0xFFFFFFFF
+#   if UINTPTR_MAX > 0xFFFFFFFF
     n |= n >> 32;
-    #endif
+#   endif
     return n + 1;
 }
 
-/* Fibonacci Hashing Constants & Helpers. */
 #define ZMAP_FIB_CONST 0x9E3779B9U
 
 static inline size_t zmap_fib_index(uint32_t hash, uint32_t bits)
@@ -372,25 +504,52 @@ static inline size_t zmap_fib_index(uint32_t hash, uint32_t bits)
 static inline size_t zmap_dist(size_t index, size_t capacity, uint32_t hash, uint32_t bits)
 {
     size_t home = zmap_fib_index(hash, bits);
-    if (index >= home) return index - home;
+    if (index >= home)
+    {
+        return index - home;
+    }
     return (index + capacity) - home;
 }
 
-/* Bucket States.
- * ZMAP_DELETED is removed. We use backward shift deletion.
- */
-typedef enum 
-{
-    ZMAP_EMPTY = 0,
-    ZMAP_OCCUPIED
-} zmap_state;
+// Safe API logic.
+#if Z_HAS_ZERROR
+    static inline zerr zmap_err_impl(int code, const char* msg, const char* file, int line, const char* func) 
+    {
+        return zerr_create_impl(code, file, line, func, "%s", msg);
+    }
 
-/* STANDARD MAP GENERATOR.
- * Stores Key and Value inline.
+    #define ZMAP_GEN_SAFE_IMPL(KeyT, ValT, Name)                                                    \
+        DEFINE_RESULT(ValT*, ResPtr_##Name)                                                         \
+                                                                                                    \
+        static inline zres zmap_put_safe_##Name(zmap_##Name *m, KeyT k, ValT v,                     \
+                                               const char* f, int l, const char* fn)                \
+        {                                                                                           \
+            if (zmap_put_##Name(m, k, v) != Z_OK)                                                   \
+            {                                                                                       \
+                return zres_err(zmap_err_impl(Z_ENOMEM, "Map Put OOM", f, l, fn));                  \
+            }                                                                                       \
+            return zres_ok();                                                                       \
+        }                                                                                           \
+                                                                                                    \
+        static inline ResPtr_##Name zmap_get_safe_##Name(zmap_##Name *m, KeyT k,                    \
+                                                        const char* f, int l, const char* fn)       \
+        {                                                                                           \
+            ValT* ptr = zmap_get_##Name(m, k);                                                      \
+            if (!ptr)                                                                               \
+            {                                                                                       \
+                return ResPtr_##Name##_err(zmap_err_impl(Z_ENOTFOUND, "Key not found", f, l, fn));  \
+            }                                                                                       \
+            return ResPtr_##Name##_ok(ptr);                                                         \
+        }
+#else
+#   define ZMAP_GEN_SAFE_IMPL(KeyT, ValT, Name)
+#endif
+
+/* * ZMAP_GENERATE_IMPL
+ * Standard In-Place Map Generator.
  */
-#define Z_MAP_GENERATE_IMPL(KeyT, ValT, Name)                                                                               \
+#define ZMAP_GENERATE_IMPL(KeyT, ValT, Name)                                                                                \
                                                                                                                             \
-    /* Individual bucket structure. */                                                                                      \
     typedef struct                                                                                                          \
     {                                                                                                                       \
         KeyT key;                                                                                                           \
@@ -399,7 +558,6 @@ typedef enum
         zmap_state state;                                                                                                   \
     } zmap_bucket_##Name;                                                                                                   \
                                                                                                                             \
-    /* The main map container. */                                                                                           \
     typedef struct                                                                                                          \
     {                                                                                                                       \
         zmap_bucket_##Name *buckets;                                                                                        \
@@ -411,79 +569,91 @@ typedef enum
         uint32_t seed;                                                                                                      \
         uint32_t (*hash_func)(KeyT, uint32_t);                                                                              \
         int      (*cmp_func)(KeyT, KeyT);                                                                                   \
-    } map_##Name;                                                                                                           \
+    } zmap_##Name;                                                                                                          \
                                                                                                                             \
-    /* Iterator state. */                                                                                                   \
     typedef struct                                                                                                          \
     {                                                                                                                       \
-        map_##Name *map;                                                                                                    \
+        zmap_##Name *map;                                                                                                   \
         size_t index;                                                                                                       \
     } zmap_iter_##Name;                                                                                                     \
                                                                                                                             \
-    static inline map_##Name map_init_ext_##Name(uint32_t (*h)(KeyT, uint32_t), int (*c)(KeyT, KeyT), float load)           \
+    static inline zmap_##Name zmap_init_ext_##Name(uint32_t (*h)(KeyT, uint32_t), int (*c)(KeyT, KeyT), float load)         \
     {                                                                                                                       \
-        return (map_##Name){                                                                                                \
+        return (zmap_##Name){                                                                                               \
             .bits = 0, .load_factor = (load <= 0.1f || load > 0.95f) ? ZMAP_DEFAULT_LOAD : load,                            \
             .seed = 0xCAFEBABE, .hash_func = h, .cmp_func = c                                                               \
         };                                                                                                                  \
     }                                                                                                                       \
                                                                                                                             \
-    static inline map_##Name map_init_##Name(uint32_t (*h)(KeyT, uint32_t), int (*c)(KeyT, KeyT))                           \
+    static inline zmap_##Name zmap_init_##Name(uint32_t (*h)(KeyT, uint32_t), int (*c)(KeyT, KeyT))                         \
     {                                                                                                                       \
-        return map_init_ext_##Name(h, c, ZMAP_DEFAULT_LOAD);                                                                \
+        return zmap_init_ext_##Name(h, c, ZMAP_DEFAULT_LOAD);                                                               \
     }                                                                                                                       \
                                                                                                                             \
-    static inline void map_set_seed_##Name(map_##Name *m, uint32_t s) { m->seed = s; }                                      \
-                                                                                                                            \
-    static inline void map_free_##Name(map_##Name *m)                                                                       \
+    static inline void zmap_set_seed_##Name(zmap_##Name *m, uint32_t s)                                                     \
     {                                                                                                                       \
-        Z_MAP_FREE(m->buckets);                                                                                             \
-        *m = (map_##Name){0};                                                                                               \
+        m->seed = s;                                                                                                        \
     }                                                                                                                       \
                                                                                                                             \
-    /* Resizes the bucket array and rehashes all items. */                                                                  \
-    static inline int map_resize_##Name(map_##Name *m, size_t new_cap) {                                                    \
-        zmap_bucket_##Name *new_buckets = (zmap_bucket_##Name*)Z_MAP_CALLOC(new_cap, sizeof(zmap_bucket_##Name));           \
-        if (!new_buckets) return Z_ERR;                                                                                     \
+    static inline void zmap_free_##Name(zmap_##Name *m)                                                                     \
+    {                                                                                                                       \
+        ZMAP_FREE(m->buckets);                                                                                              \
+        *m = (zmap_##Name){0};                                                                                              \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline int zmap_resize_##Name(zmap_##Name *m, size_t new_cap) {                                                  \
+        zmap_bucket_##Name *new_buckets = (zmap_bucket_##Name*)ZMAP_CALLOC(new_cap, sizeof(zmap_bucket_##Name));            \
+        if (!new_buckets)                                                                                                   \
+        {                                                                                                                   \
+            return Z_ENOMEM;                                                                                                \
+        }                                                                                                                   \
         uint32_t new_bits = 0; size_t temp = new_cap; while(temp >>= 1) new_bits++;                                         \
                                                                                                                             \
         for (size_t i = 0; i < m->capacity; i++)                                                                            \
         {                                                                                                                   \
-            if (m->buckets[i].state == ZMAP_OCCUPIED)                                                                       \
+            if (ZMAP_OCCUPIED == m->buckets[i].state)                                                                       \
             {                                                                                                               \
                 zmap_bucket_##Name entry = m->buckets[i];                                                                   \
                 size_t idx = zmap_fib_index(entry.stored_hash, new_bits);                                                   \
                 size_t dist = 0;                                                                                            \
                 for (;;)                                                                                                    \
                 {                                                                                                           \
-                    if (new_buckets[idx].state == ZMAP_EMPTY)                                                               \
+                    if (ZMAP_EMPTY == new_buckets[idx].state)                                                               \
                     {                                                                                                       \
-                        new_buckets[idx] = entry; new_buckets[idx].state = ZMAP_OCCUPIED; break;                            \
+                        new_buckets[idx] = entry;                                                                           \
+                        new_buckets[idx].state = ZMAP_OCCUPIED;                                                             \
+                        break;                                                                                              \
                     }                                                                                                       \
                     size_t existing_dist = zmap_dist(idx, new_cap, new_buckets[idx].stored_hash, new_bits);                 \
                     if (dist > existing_dist)                                                                               \
                     {                                                                                                       \
                         zmap_bucket_##Name swap_tmp = new_buckets[idx];                                                     \
-                        new_buckets[idx] = entry; entry = swap_tmp;                                                         \
+                        new_buckets[idx] = entry;                                                                           \
+                        entry = swap_tmp;                                                                                   \
                         dist = existing_dist;                                                                               \
                     }                                                                                                       \
-                    idx = (idx + 1) & (new_cap - 1); dist++;                                                                \
+                    idx = (idx + 1) & (new_cap - 1);                                                                        \
+                    dist++;                                                                                                 \
                 }                                                                                                           \
             }                                                                                                               \
         }                                                                                                                   \
-        Z_MAP_FREE(m->buckets);                                                                                             \
-        m->buckets = new_buckets; m->capacity = new_cap; m->bits = new_bits;                                                \
+        ZMAP_FREE(m->buckets);                                                                                              \
+        m->buckets = new_buckets;                                                                                           \
+        m->capacity = new_cap;                                                                                              \
+        m->bits = new_bits;                                                                                                 \
         m->threshold = (size_t)(new_cap * m->load_factor);                                                                  \
         return Z_OK;                                                                                                        \
     }                                                                                                                       \
                                                                                                                             \
-    /* Inserts or updates a value. Clean Robin Hood (No Tombstones). */                                                     \
-    static inline int map_put_##Name(map_##Name *m, KeyT key, ValT val)                                                     \
+    static inline int zmap_put_##Name(zmap_##Name *m, KeyT key, ValT val)                                                   \
     {                                                                                                                       \
         if (m->count >= m->threshold)                                                                                       \
         {                                                                                                                   \
             size_t new_cap = zmap_next_pow2(Z_GROWTH_FACTOR(m->capacity));                                                  \
-            if (map_resize_##Name(m, new_cap) != Z_OK) return Z_ERR;                                                        \
+            if (Z_OK != zmap_resize_##Name(m, new_cap))                                                                     \
+            {                                                                                                               \
+                return Z_ENOMEM;                                                                                            \
+            }                                                                                                               \
         }                                                                                                                   \
         uint32_t hash = m->hash_func(key, m->seed);                                                                         \
         size_t idx = zmap_fib_index(hash, m->bits);                                                                         \
@@ -493,17 +663,17 @@ typedef enum
                                                                                                                             \
         for (;;)                                                                                                            \
         {                                                                                                                   \
-            if (m->buckets[idx].state == ZMAP_EMPTY)                                                                        \
+            if (ZMAP_EMPTY == m->buckets[idx].state)                                                                        \
             {                                                                                                               \
                 m->buckets[idx] = entry;                                                                                    \
-                m->count++; return Z_OK;                                                                                    \
+                m->count++;                                                                                                 \
+                return Z_OK;                                                                                                \
             }                                                                                                               \
-            if (m->buckets[idx].stored_hash == hash && m->cmp_func(m->buckets[idx].key, key) == 0)                          \
+            if (m->buckets[idx].stored_hash == hash && 0 == m->cmp_func(m->buckets[idx].key, key))                          \
             {                                                                                                               \
                 m->buckets[idx].value = val;                                                                                \
                 return Z_OK;                                                                                                \
             }                                                                                                               \
-            /* Robin Hood swap check. */                                                                                    \
             size_t existing_dist = zmap_dist(idx, m->capacity, m->buckets[idx].stored_hash, m->bits);                       \
             if (dist > existing_dist)                                                                                       \
             {                                                                                                               \
@@ -517,53 +687,376 @@ typedef enum
         }                                                                                                                   \
     }                                                                                                                       \
                                                                                                                             \
-    static inline ValT* map_get_##Name(map_##Name *m, KeyT key)                                                             \
+    static inline ValT* zmap_get_##Name(zmap_##Name *m, KeyT key)                                                           \
     {                                                                                                                       \
-        if (m->count == 0) return NULL;                                                                                     \
+        if (0 == m->count)                                                                                                  \
+        {                                                                                                                   \
+            return NULL;                                                                                                    \
+        }                                                                                                                   \
         uint32_t hash = m->hash_func(key, m->seed);                                                                         \
         size_t idx = zmap_fib_index(hash, m->bits);                                                                         \
         size_t dist = 0;                                                                                                    \
         for (;;)                                                                                                            \
         {                                                                                                                   \
-            if (m->buckets[idx].state == ZMAP_EMPTY) return NULL;                                                           \
+            if (ZMAP_EMPTY == m->buckets[idx].state)                                                                        \
+            {                                                                                                               \
+                return NULL;                                                                                                \
+            }                                                                                                               \
             size_t existing_dist = zmap_dist(idx, m->capacity, m->buckets[idx].stored_hash, m->bits);                       \
-            if (dist > existing_dist) return NULL; /* Early Exit */                                                         \
-            if (m->buckets[idx].stored_hash == hash && m->cmp_func(m->buckets[idx].key, key) == 0)                          \
+            if (dist > existing_dist)                                                                                       \
+            {                                                                                                               \
+                return NULL;                                                                                                \
+            }                                                                                                               \
+            if (m->buckets[idx].stored_hash == hash && 0 == m->cmp_func(m->buckets[idx].key, key))                          \
+            {                                                                                                               \
                 return &m->buckets[idx].value;                                                                              \
+            }                                                                                                               \
             idx = (idx + 1) & (m->capacity - 1);                                                                            \
             dist++;                                                                                                         \
         }                                                                                                                   \
     }                                                                                                                       \
                                                                                                                             \
-    /* Removes an item using Backward Shift Deletion. */                                                                      \
-    static inline void map_remove_##Name(map_##Name *m, KeyT key)                                                           \
+    static inline void zmap_remove_##Name(zmap_##Name *m, KeyT key)                                                         \
     {                                                                                                                       \
-        if (m->count == 0) return;                                                                                          \
+        if (0 == m->count)                                                                                                  \
+        {                                                                                                                   \
+            return;                                                                                                         \
+        }                                                                                                                   \
         uint32_t hash = m->hash_func(key, m->seed);                                                                         \
         size_t idx = zmap_fib_index(hash, m->bits);                                                                         \
         size_t dist = 0;                                                                                                    \
         for (;;)                                                                                                            \
         {                                                                                                                   \
-            if (m->buckets[idx].state == ZMAP_EMPTY) return;                                                                \
-            size_t existing_dist = zmap_dist(idx, m->capacity, m->buckets[idx].stored_hash, m->bits);                       \
-            if (dist > existing_dist) return;                                                                               \
-            if (m->buckets[idx].stored_hash == hash && m->cmp_func(m->buckets[idx].key, key) == 0)                          \
+            if (ZMAP_EMPTY == m->buckets[idx].state)                                                                        \
             {                                                                                                               \
-                /* Item found. Perform Backward Shift. */                                                                   \
+                return;                                                                                                     \
+            }                                                                                                               \
+            size_t existing_dist = zmap_dist(idx, m->capacity, m->buckets[idx].stored_hash, m->bits);                       \
+            if (dist > existing_dist)                                                                                       \
+            {                                                                                                               \
+                return;                                                                                                     \
+            }                                                                                                               \
+            if (m->buckets[idx].stored_hash == hash && 0 == m->cmp_func(m->buckets[idx].key, key))                          \
+            {                                                                                                               \
                 m->count--;                                                                                                 \
                 for (;;)                                                                                                    \
                 {                                                                                                           \
                     size_t next = (idx + 1) & (m->capacity - 1);                                                            \
-                    if (m->buckets[next].state == ZMAP_EMPTY)                                                               \
+                    if (ZMAP_EMPTY == m->buckets[next].state)                                                               \
                     {                                                                                                       \
                         m->buckets[idx].state = ZMAP_EMPTY;                                                                 \
                         return;                                                                                             \
                     }                                                                                                       \
                     size_t next_dist = zmap_dist(next, m->capacity, m->buckets[next].stored_hash, m->bits);                 \
-                    if (next_dist == 0)                                                                                     \
+                    if (0 == next_dist)                                                                                     \
                     {                                                                                                       \
                         m->buckets[idx].state = ZMAP_EMPTY;                                                                 \
                         return;                                                                                             \
+                    }                                                                                                       \
+                    m->buckets[idx] = m->buckets[next];                                                                     \
+                    idx = next;                                                                                             \
+                }                                                                                                           \
+            }                                                                                                               \
+            idx = (idx + 1) & (m->capacity - 1); dist++;                                                                    \
+        }                                                                                                                   \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline zmap_iter_##Name zmap_iter_init_##Name(zmap_##Name *m)                                                    \
+    {                                                                                                                       \
+        return (zmap_iter_##Name){ .map = m, .index = 0 };                                                                  \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline bool zmap_iter_next_##Name(zmap_iter_##Name *it, KeyT *out_k, ValT *out_v)                                \
+    {                                                                                                                       \
+        if (!it->map || !it->map->buckets)                                                                                  \
+        {                                                                                                                   \
+            return false;                                                                                                   \
+        }                                                                                                                   \
+        while (it->index < it->map->capacity)                                                                               \
+        {                                                                                                                   \
+            size_t i = it->index++;                                                                                         \
+            if (ZMAP_OCCUPIED == it->map->buckets[i].state)                                                                 \
+            {                                                                                                               \
+                if (out_k)                                                                                                  \
+                {                                                                                                           \
+                    *out_k = it->map->buckets[i].key;                                                                       \
+                }                                                                                                           \
+                if (out_v)                                                                                                  \
+                {                                                                                                           \
+                    *out_v = it->map->buckets[i].value;                                                                     \
+                }                                                                                                           \
+                return true;                                                                                                \
+            }                                                                                                               \
+        }                                                                                                                   \
+        return false;                                                                                                       \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline size_t zmap_size_##Name(zmap_##Name *m)                                                                   \
+    {                                                                                                                       \
+        return m->count;                                                                                                    \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline void zmap_clear_##Name(zmap_##Name *m)                                                                    \
+    {                                                                                                                       \
+        if (m->capacity > 0)                                                                                                \
+        {                                                                                                                   \
+            memset(m->buckets, 0, m->capacity * sizeof(zmap_bucket_##Name));                                                \
+        }                                                                                                                   \
+        m->count = 0;                                                                                                       \
+    }                                                                                                                       \
+                                                                                                                            \
+    /* Inject safe API. */                                                                                                  \
+    ZMAP_GEN_SAFE_IMPL(KeyT, ValT, Name)
+
+/*
+ * ZMAP_GENERATE_STABLE_IMPL
+ * Stable Map Generator. Values are heap-allocated pointers.
+ */
+#define ZMAP_GENERATE_STABLE_IMPL(KeyT, ValT, Name)                                                                         \
+                                                                                                                            \
+    typedef struct                                                                                                          \
+    {                                                                                                                       \
+        KeyT key;                                                                                                           \
+        ValT *value;                                                                                                        \
+        uint32_t stored_hash;                                                                                               \
+        zmap_state state;                                                                                                   \
+    } zmap_bucket_stable_##Name;                                                                                            \
+                                                                                                                            \
+    typedef struct                                                                                                          \
+    {                                                                                                                       \
+        zmap_bucket_stable_##Name *buckets;                                                                                 \
+        size_t capacity;                                                                                                    \
+        size_t count;                                                                                                       \
+        size_t threshold;                                                                                                   \
+        uint32_t bits;                                                                                                      \
+        float  load_factor;                                                                                                 \
+        uint32_t seed;                                                                                                      \
+        uint32_t (*hash_func)(KeyT, uint32_t);                                                                              \
+        int      (*cmp_func)(KeyT, KeyT);                                                                                   \
+    } zmap_stable_##Name;                                                                                                   \
+                                                                                                                            \
+    typedef struct                                                                                                          \
+    {                                                                                                                       \
+        zmap_stable_##Name *map;                                                                                            \
+        size_t index;                                                                                                       \
+    } zmap_iter_stable_##Name;                                                                                              \
+                                                                                                                            \
+    static inline zmap_stable_##Name zmap_init_ext_stable_##Name(uint32_t (*h)(KeyT, uint32_t),                             \
+                                                                 int (*c)(KeyT, KeyT), float load)                          \
+    {                                                                                                                       \
+        return (zmap_stable_##Name){                                                                                        \
+            .bits = 0, .load_factor = (load <= 0.1f || load > 0.95f) ? ZMAP_DEFAULT_LOAD : load,                            \
+            .seed = 0xCAFEBABE, .hash_func = h, .cmp_func = c                                                               \
+        };                                                                                                                  \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline zmap_stable_##Name zmap_init_stable_##Name(uint32_t (*h)(KeyT, uint32_t), int (*c)(KeyT, KeyT))           \
+    {                                                                                                                       \
+        return zmap_init_ext_stable_##Name(h, c, ZMAP_DEFAULT_LOAD);                                                        \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline void zmap_set_seed_stable_##Name(zmap_stable_##Name *m, uint32_t s)                                       \
+    {                                                                                                                       \
+        m->seed = s;                                                                                                        \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline void zmap_free_stable_##Name(zmap_stable_##Name *m)                                                       \
+    {                                                                                                                       \
+        if (m->buckets)                                                                                                     \
+        {                                                                                                                   \
+            for (size_t i = 0; i < m->capacity; i++)                                                                        \
+            {                                                                                                               \
+                if (ZMAP_OCCUPIED == m->buckets[i].state)                                                                   \
+                {                                                                                                           \
+                    ZMAP_FREE(m->buckets[i].value);                                                                         \
+                }                                                                                                           \
+            }                                                                                                               \
+            ZMAP_FREE(m->buckets);                                                                                          \
+        }                                                                                                                   \
+        *m = (zmap_stable_##Name){0};                                                                                       \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline int zmap_resize_stable_##Name(zmap_stable_##Name *m, size_t new_cap)                                      \
+    {                                                                                                                       \
+        zmap_bucket_stable_##Name *new_buckets = (zmap_bucket_stable_##Name*)                                               \
+                                                 ZMAP_CALLOC(new_cap, sizeof(zmap_bucket_stable_##Name));                   \
+        if (!new_buckets)                                                                                                   \
+        {                                                                                                                   \
+            return Z_ENOMEM;                                                                                                \
+        }                                                                                                                   \
+        uint32_t new_bits = 0;                                                                                              \
+        size_t temp = new_cap;                                                                                              \
+        while(temp >>= 1)                                                                                                   \
+        {                                                                                                                   \
+            new_bits++;                                                                                                     \
+        }                                                                                                                   \
+                                                                                                                            \
+        for (size_t i = 0; i < m->capacity; i++)                                                                            \
+        {                                                                                                                   \
+            if (ZMAP_OCCUPIED == m->buckets[i].state)                                                                       \
+            {                                                                                                               \
+                zmap_bucket_stable_##Name entry = m->buckets[i];                                                            \
+                size_t idx = zmap_fib_index(entry.stored_hash, new_bits);                                                   \
+                size_t dist = 0;                                                                                            \
+                for (;;)                                                                                                    \
+                {                                                                                                           \
+                    if (ZMAP_EMPTY == new_buckets[idx].state)                                                               \
+                    {                                                                                                       \
+                        new_buckets[idx] = entry;                                                                           \
+                        new_buckets[idx].state = ZMAP_OCCUPIED;                                                             \
+                        break;                                                                                              \
+                    }                                                                                                       \
+                    size_t existing_dist = zmap_dist(idx, new_cap, new_buckets[idx].stored_hash, new_bits);                 \
+                    if (dist > existing_dist)                                                                               \
+                    {                                                                                                       \
+                        zmap_bucket_stable_##Name tmp = new_buckets[idx];                                                   \
+                        new_buckets[idx] = entry;                                                                           \
+                        entry = tmp;                                                                                        \
+                        dist = existing_dist;                                                                               \
+                    }                                                                                                       \
+                    idx = (idx + 1) & (new_cap - 1); dist++;                                                                \
+                }                                                                                                           \
+            }                                                                                                               \
+        }                                                                                                                   \
+        ZMAP_FREE(m->buckets);                                                                                              \
+        m->buckets = new_buckets;                                                                                           \
+        m->capacity = new_cap;                                                                                              \
+        m->bits = new_bits;                                                                                                 \
+        m->threshold = (size_t)(new_cap * m->load_factor);                                                                  \
+        return Z_OK;                                                                                                        \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline int zmap_put_stable_##Name(zmap_stable_##Name *m, KeyT key, ValT val)                                     \
+    {                                                                                                                       \
+        if (m->count >= m->threshold)                                                                                       \
+        {                                                                                                                   \
+            size_t new_cap = zmap_next_pow2(Z_GROWTH_FACTOR(m->capacity));                                                  \
+            if (Z_OK != zmap_resize_stable_##Name(m, new_cap))                                                              \
+            {                                                                                                               \
+                return Z_ENOMEM;                                                                                            \
+            }                                                                                                               \
+        }                                                                                                                   \
+        uint32_t hash = m->hash_func(key, m->seed);                                                                         \
+        size_t idx = zmap_fib_index(hash, m->bits);                                                                         \
+        size_t dist = 0;                                                                                                    \
+        zmap_bucket_stable_##Name entry = (zmap_bucket_stable_##Name){                                                      \
+            .key = key, .value = NULL, .stored_hash = hash, .state = ZMAP_OCCUPIED };                                       \
+                                                                                                                            \
+        for (;;)                                                                                                            \
+        {                                                                                                                   \
+            if (ZMAP_EMPTY == m->buckets[idx].state)                                                                        \
+            {                                                                                                               \
+                /* Allocate value on heap for stability */                                                                  \
+                if (!entry.value)                                                                                           \
+                {                                                                                                           \
+                    entry.value = (ValT*)ZMAP_MALLOC(sizeof(ValT));                                                         \
+                    if (!entry.value)                                                                                       \
+                    {                                                                                                       \
+                        return Z_ENOMEM;                                                                                    \
+                    }                                                                                                       \
+                    *entry.value = val;                                                                                     \
+                }                                                                                                           \
+                m->buckets[idx] = entry;                                                                                    \
+                m->count++;                                                                                                 \
+                return Z_OK;                                                                                                \
+            }                                                                                                               \
+            if (m->buckets[idx].stored_hash == hash && 0 == m->cmp_func(m->buckets[idx].key, key))                          \
+            {                                                                                                               \
+                 *m->buckets[idx].value = val; /* Update existing */                                                        \
+                 if (entry.value)                                                                                           \
+                 {                                                                                                          \
+                    ZMAP_FREE(entry.value);                                                                                 \
+                 }                                                                                                          \
+                 return Z_OK;                                                                                               \
+            }                                                                                                               \
+            size_t existing_dist = zmap_dist(idx, m->capacity, m->buckets[idx].stored_hash, m->bits);                       \
+            if (dist > existing_dist)                                                                                       \
+            {                                                                                                               \
+                if (!entry.value)                                                                                           \
+                {                                                                                                           \
+                    entry.value = (ValT*)ZMAP_MALLOC(sizeof(ValT));                                                         \
+                    if (!entry.value)                                                                                       \
+                    {                                                                                                       \
+                        return Z_ENOMEM;                                                                                    \
+                    }                                                                                                       \
+                    *entry.value = val;                                                                                     \
+                }                                                                                                           \
+                zmap_bucket_stable_##Name temp = m->buckets[idx];                                                           \
+                m->buckets[idx] = entry;                                                                                    \
+                entry = temp;                                                                                               \
+                dist = existing_dist;                                                                                       \
+            }                                                                                                               \
+            idx = (idx + 1) & (m->capacity - 1);                                                                            \
+            dist++;                                                                                                         \
+        }                                                                                                                   \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline ValT* zmap_get_stable_##Name(zmap_stable_##Name *m, KeyT key)                                             \
+    {                                                                                                                       \
+        if (0 == m->count)                                                                                                  \
+        {                                                                                                                   \
+            return NULL;                                                                                                    \
+        }                                                                                                                   \
+        uint32_t hash = m->hash_func(key, m->seed);                                                                         \
+        size_t idx = zmap_fib_index(hash, m->bits);                                                                         \
+        size_t dist = 0;                                                                                                    \
+        for (;;)                                                                                                            \
+        {                                                                                                                   \
+            if (ZMAP_EMPTY == m->buckets[idx].state)                                                                        \
+            {                                                                                                               \
+                return NULL;                                                                                                \
+            }                                                                                                               \
+            size_t existing_dist = zmap_dist(idx, m->capacity, m->buckets[idx].stored_hash, m->bits);                       \
+            if (dist > existing_dist)                                                                                       \
+            {                                                                                                               \
+                return NULL;                                                                                                \
+            }                                                                                                               \
+            if (m->buckets[idx].stored_hash == hash && 0 == m->cmp_func(m->buckets[idx].key, key))                          \
+            {                                                                                                               \
+                return m->buckets[idx].value;                                                                               \
+            }                                                                                                               \
+            idx = (idx + 1) & (m->capacity - 1);                                                                            \
+            dist++;                                                                                                         \
+        }                                                                                                                   \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline void zmap_remove_stable_##Name(zmap_stable_##Name *m, KeyT key)                                           \
+    {                                                                                                                       \
+        if (0 == m->count)                                                                                                  \
+        {                                                                                                                   \
+            return;                                                                                                         \
+        }                                                                                                                   \
+        uint32_t hash = m->hash_func(key, m->seed);                                                                         \
+        size_t idx = zmap_fib_index(hash, m->bits);                                                                         \
+        size_t dist = 0;                                                                                                    \
+        for (;;)                                                                                                            \
+        {                                                                                                                   \
+            if (ZMAP_EMPTY == m->buckets[idx].state)                                                                        \
+            {                                                                                                               \
+                return;                                                                                                     \
+            }                                                                                                               \
+            size_t existing_dist = zmap_dist(idx, m->capacity, m->buckets[idx].stored_hash, m->bits);                       \
+            if (dist > existing_dist)                                                                                       \
+            {                                                                                                               \
+                return;                                                                                                     \
+            }                                                                                                               \
+            if (m->buckets[idx].stored_hash == hash && 0 == m->cmp_func(m->buckets[idx].key, key))                          \
+            {                                                                                                               \
+                ZMAP_FREE(m->buckets[idx].value);                                                                           \
+                m->count--;                                                                                                 \
+                for (;;)                                                                                                    \
+                {                                                                                                           \
+                    size_t next = (idx + 1) & (m->capacity - 1);                                                            \
+                    if (ZMAP_EMPTY == m->buckets[next].state)                                                               \
+                    {                                                                                                       \
+                         m->buckets[idx].state = ZMAP_EMPTY;                                                                \
+                         return;                                                                                            \
+                    }                                                                                                       \
+                    size_t next_dist = zmap_dist(next, m->capacity, m->buckets[next].stored_hash, m->bits);                 \
+                    if (0 == next_dist)                                                                                     \
+                    {                                                                                                       \
+                         m->buckets[idx].state = ZMAP_EMPTY;                                                                \
+                         return;                                                                                            \
                     }                                                                                                       \
                     m->buckets[idx] = m->buckets[next];                                                                     \
                     idx = next;                                                                                             \
@@ -574,345 +1067,193 @@ typedef enum
         }                                                                                                                   \
     }                                                                                                                       \
                                                                                                                             \
-    static inline zmap_iter_##Name map_iter_init_##Name(map_##Name *m)                                                      \
+    static inline size_t zmap_size_stable_##Name(zmap_stable_##Name *m)                                                     \
     {                                                                                                                       \
-        return (zmap_iter_##Name){ .map = m, .index = 0 };                                                                  \
+        return m->count;                                                                                                    \
     }                                                                                                                       \
                                                                                                                             \
-    static inline bool map_iter_next_##Name(zmap_iter_##Name *it, KeyT *out_k, ValT *out_v)                                 \
+    static inline void zmap_clear_stable_##Name(zmap_stable_##Name *m)                                                      \
     {                                                                                                                       \
-        if (!it->map || !it->map->buckets) return false;                                                                    \
-        while (it->index < it->map->capacity)                                                                               \
+        if (m->capacity > 0)                                                                                                \
+        {                                                                                                                   \
+            for (size_t i = 0; i < m->capacity; i++)                                                                        \
+            {                                                                                                               \
+                if (ZMAP_OCCUPIED == m->buckets[i].state)                                                                   \
+                {                                                                                                           \
+                    ZMAP_FREE(m->buckets[i].value);                                                                         \
+                }                                                                                                           \
+            }                                                                                                               \
+            memset(m->buckets, 0, m->capacity * sizeof(zmap_bucket_stable_##Name));                                         \
+        }                                                                                                                   \
+        m->count = 0;                                                                                                       \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline zmap_iter_stable_##Name zmap_iter_init_stable_##Name(zmap_stable_##Name *m)                               \
+    {                                                                                                                       \
+        return (zmap_iter_stable_##Name){m, 0};                                                                             \
+    }                                                                                                                       \
+                                                                                                                            \
+    static inline bool zmap_iter_next_stable_##Name(zmap_iter_stable_##Name *it, KeyT *out_k, ValT *out_v)                  \
+    {                                                                                                                       \
+        if(!it->map || !it->map->buckets)                                                                                   \
+        {                                                                                                                   \
+            return false;                                                                                                   \
+        }                                                                                                                   \
+        while(it->index < it->map->capacity)                                                                                \
         {                                                                                                                   \
             size_t i = it->index++;                                                                                         \
-            if (it->map->buckets[i].state == ZMAP_OCCUPIED)                                                                 \
+            if(ZMAP_OCCUPIED == it->map->buckets[i].state)                                                                  \
             {                                                                                                               \
-                if (out_k) *out_k = it->map->buckets[i].key;                                                                \
-                if (out_v) *out_v = it->map->buckets[i].value;                                                              \
+                if(out_k)                                                                                                   \
+                {                                                                                                           \
+                    *out_k = it->map->buckets[i].key;                                                                       \
+                }                                                                                                           \
+                if(out_v)                                                                                                   \
+                {                                                                                                           \
+                    *out_v = *it->map->buckets[i].value;                                                                    \
+                }                                                                                                           \
                 return true;                                                                                                \
             }                                                                                                               \
         }                                                                                                                   \
         return false;                                                                                                       \
-    }                                                                                                                       \
-                                                                                                                            \
-    static inline size_t map_size_##Name(map_##Name *m) { return m->count; }                                                \
-                                                                                                                            \
-    static inline void map_clear_##Name(map_##Name *m)                                                                      \
-    {                                                                                                                       \
-        if (m->capacity > 0) memset(m->buckets, 0, m->capacity * sizeof(zmap_bucket_##Name));                               \
-        m->count = 0;                                                                                                       \
     }
 
-/* STABLE MAP GENERATOR (pointer optimized / uthash-like)
- * Stores a POINTER to the value (ValT*). The bucket owns the memory.
- */
-#define Z_MAP_GENERATE_STABLE_IMPL(KeyT, ValT, Name)                                                                                    \
-                                                                                                                                        \
-    typedef struct                                                                                                                      \
-    {                                                                                                                                   \
-        KeyT key;                                                                                                                       \
-        ValT *value;                                                                                                                    \
-        uint32_t stored_hash;                                                                                                           \
-        zmap_state state;                                                                                                               \
-    } zmap_bucket_stable_##Name;                                                                                                        \
-                                                                                                                                        \
-    typedef struct                                                                                                                      \
-    {                                                                                                                                   \
-        zmap_bucket_stable_##Name *buckets;                                                                                             \
-        size_t capacity; size_t count; size_t threshold;                                                                                \
-        uint32_t bits;                                                                                                                  \
-        float  load_factor; uint32_t seed;                                                                                              \
-        uint32_t (*hash_func)(KeyT, uint32_t);                                                                                          \
-        int      (*cmp_func)(KeyT, KeyT);                                                                                               \
-    } map_stable_##Name;                                                                                                                \
-                                                                                                                                        \
-    typedef struct                                                                                                                      \
-    {                                                                                                                                   \
-        map_stable_##Name *map;                                                                                                         \
-        size_t index;                                                                                                                   \
-    } zmap_iter_stable_##Name;                                                                                                          \
-                                                                                                                                        \
-    static inline map_stable_##Name map_init_ext_stable_##Name(uint32_t (*h)(KeyT, uint32_t), int (*c)(KeyT, KeyT), float load)         \
-    {                                                                                                                                   \
-        return (map_stable_##Name){ .bits = 0, .load_factor = (load <= 0.1f || load > 0.95f) ? ZMAP_DEFAULT_LOAD : load,                \
-                                    .seed = 0xCAFEBABE, .hash_func = h, .cmp_func = c };                                                \
-    }                                                                                                                                   \
-                                                                                                                                        \
-    static inline map_stable_##Name map_init_stable_##Name(uint32_t (*h)(KeyT, uint32_t), int (*c)(KeyT, KeyT))                         \
-    {                                                                                                                                   \
-        return map_init_ext_stable_##Name(h, c, ZMAP_DEFAULT_LOAD);                                                                     \
-    }                                                                                                                                   \
-                                                                                                                                        \
-    static inline void map_set_seed_stable_##Name(map_stable_##Name *m, uint32_t s) { m->seed = s; }                                    \
-                                                                                                                                        \
-    static inline void map_free_stable_##Name(map_stable_##Name *m)                                                                     \
-    {                                                                                                                                   \
-        if (m->buckets)                                                                                                                 \
-        {                                                                                                                               \
-            for (size_t i = 0; i < m->capacity; i++)                                                                                    \
-                if (m->buckets[i].state == ZMAP_OCCUPIED) Z_MAP_FREE(m->buckets[i].value);                                              \
-            Z_MAP_FREE(m->buckets);                                                                                                     \
-        }                                                                                                                               \
-        *m = (map_stable_##Name){0};                                                                                                    \
-    }                                                                                                                                   \
-                                                                                                                                        \
-    static inline int map_resize_stable_##Name(map_stable_##Name *m, size_t new_cap)                                                    \
-    {                                                                                                                                   \
-        zmap_bucket_stable_##Name *new_buckets = (zmap_bucket_stable_##Name*)Z_MAP_CALLOC(new_cap, sizeof(zmap_bucket_stable_##Name));  \
-        if (!new_buckets) return Z_ERR;                                                                                                 \
-        uint32_t new_bits = 0; size_t temp = new_cap; while(temp >>= 1) new_bits++;                                                     \
-                                                                                                                                        \
-        for (size_t i = 0; i < m->capacity; i++)                                                                                        \
-        {                                                                                                                               \
-            if (m->buckets[i].state == ZMAP_OCCUPIED)                                                                                   \
-            {                                                                                                                           \
-                zmap_bucket_stable_##Name entry = m->buckets[i];                                                                        \
-                size_t idx = zmap_fib_index(entry.stored_hash, new_bits);                                                               \
-                size_t dist = 0;                                                                                                        \
-                for (;;) {                                                                                                              \
-                    if (new_buckets[idx].state == ZMAP_EMPTY) {                                                                         \
-                        new_buckets[idx] = entry; new_buckets[idx].state = ZMAP_OCCUPIED; break;                                        \
-                    }                                                                                                                   \
-                    size_t existing_dist = zmap_dist(idx, new_cap, new_buckets[idx].stored_hash, new_bits);                             \
-                    if (dist > existing_dist) {                                                                                         \
-                        zmap_bucket_stable_##Name tmp = new_buckets[idx];                                                               \
-                        new_buckets[idx] = entry; entry = tmp;                                                                          \
-                        dist = existing_dist;                                                                                           \
-                    }                                                                                                                   \
-                    idx = (idx + 1) & (new_cap - 1); dist++;                                                                            \
-                }                                                                                                                       \
-            }                                                                                                                           \
-        }                                                                                                                               \
-        Z_MAP_FREE(m->buckets); m->buckets = new_buckets; m->capacity = new_cap; m->bits = new_bits;                                    \
-        m->threshold = (size_t)(new_cap * m->load_factor);                                                                              \
-        return Z_OK;                                                                                                                    \
-    }                                                                                                                                   \
-                                                                                                                                        \
-    static inline int map_put_stable_##Name(map_stable_##Name *m, KeyT key, ValT val)                                                   \
-    {                                                                                                                                   \
-        if (m->count >= m->threshold)                                                                                                   \
-        {                                                                                                                               \
-            size_t new_cap = zmap_next_pow2(Z_GROWTH_FACTOR(m->capacity));                                                              \
-            if (map_resize_stable_##Name(m, new_cap) != Z_OK) return Z_ERR;                                                             \
-        }                                                                                                                               \
-        uint32_t hash = m->hash_func(key, m->seed);                                                                                     \
-        size_t idx = zmap_fib_index(hash, m->bits);                                                                                     \
-        size_t dist = 0;                                                                                                                \
-        zmap_bucket_stable_##Name entry = (zmap_bucket_stable_##Name){                                                                  \
-            .key = key, .value = NULL, .stored_hash = hash, .state = ZMAP_OCCUPIED };                                                   \
-                                                                                                                                        \
-        for (;;)                                                                                                                        \
-        {                                                                                                                               \
-            if (m->buckets[idx].state == ZMAP_EMPTY)                                                                                    \
-            {                                                                                                                           \
-                if (!entry.value)                                                                                                       \
-                {                                                                                                                       \
-                    entry.value = (ValT*)Z_MAP_MALLOC(sizeof(ValT));                                                                    \
-                    if (!entry.value) return Z_ERR;                                                                                     \
-                    *entry.value = val;                                                                                                 \
-                }                                                                                                                       \
-                m->buckets[idx] = entry; m->count++; return Z_OK;                                                                       \
-            }                                                                                                                           \
-            if (m->buckets[idx].stored_hash == hash && m->cmp_func(m->buckets[idx].key, key) == 0)                                      \
-            {                                                                                                                           \
-                 *m->buckets[idx].value = val;                                                                                          \
-                 if (entry.value) Z_MAP_FREE(entry.value);                                                                              \
-                 return Z_OK;                                                                                                           \
-            }                                                                                                                           \
-            size_t existing_dist = zmap_dist(idx, m->capacity, m->buckets[idx].stored_hash, m->bits);                                   \
-            if (dist > existing_dist)                                                                                                   \
-            {                                                                                                                           \
-                if (!entry.value)                                                                                                       \
-                {                                                                                                                       \
-                    entry.value = (ValT*)Z_MAP_MALLOC(sizeof(ValT));                                                                    \
-                    if (!entry.value) return Z_ERR;                                                                                     \
-                    *entry.value = val;                                                                                                 \
-                }                                                                                                                       \
-                zmap_bucket_stable_##Name temp = m->buckets[idx];                                                                       \
-                m->buckets[idx] = entry;                                                                                                \
-                entry = temp;                                                                                                           \
-                dist = existing_dist;                                                                                                   \
-            }                                                                                                                           \
-            idx = (idx + 1) & (m->capacity - 1); dist++;                                                                                \
-        }                                                                                                                               \
-    }                                                                                                                                   \
-                                                                                                                                        \
-    static inline ValT* map_get_stable_##Name(map_stable_##Name *m, KeyT key)                                                           \
-    {                                                                                                                                   \
-        if (m->count == 0) return NULL;                                                                                                 \
-        uint32_t hash = m->hash_func(key, m->seed);                                                                                     \
-        size_t idx = zmap_fib_index(hash, m->bits);                                                                                     \
-        size_t dist = 0;                                                                                                                \
-        for (;;)                                                                                                                        \
-        {                                                                                                                               \
-            if (m->buckets[idx].state == ZMAP_EMPTY) return NULL;                                                                       \
-            size_t existing_dist = zmap_dist(idx, m->capacity, m->buckets[idx].stored_hash, m->bits);                                   \
-            if (dist > existing_dist) return NULL;                                                                                      \
-            if (m->buckets[idx].stored_hash == hash && m->cmp_func(m->buckets[idx].key, key) == 0) return m->buckets[idx].value;        \
-            idx = (idx + 1) & (m->capacity - 1); dist++;                                                                                \
-        }                                                                                                                               \
-    }                                                                                                                                   \
-                                                                                                                                        \
-    static inline void map_remove_stable_##Name(map_stable_##Name *m, KeyT key)                                                         \
-    {                                                                                                                                   \
-        if (m->count == 0) return;                                                                                                      \
-        uint32_t hash = m->hash_func(key, m->seed);                                                                                     \
-        size_t idx = zmap_fib_index(hash, m->bits);                                                                                     \
-        size_t dist = 0;                                                                                                                \
-        for (;;)                                                                                                                        \
-        {                                                                                                                               \
-            if (m->buckets[idx].state == ZMAP_EMPTY) return;                                                                            \
-            size_t existing_dist = zmap_dist(idx, m->capacity, m->buckets[idx].stored_hash, m->bits);                                   \
-            if (dist > existing_dist) return;                                                                                           \
-            if (m->buckets[idx].stored_hash == hash && m->cmp_func(m->buckets[idx].key, key) == 0)                                      \
-            {                                                                                                                           \
-                Z_MAP_FREE(m->buckets[idx].value);                                                                                      \
-                m->count--;                                                                                                             \
-                for (;;)                                                                                                                \
-                {                                                                                                                       \
-                    size_t next = (idx + 1) & (m->capacity - 1);                                                                        \
-                    if (m->buckets[next].state == ZMAP_EMPTY)                                                                           \
-                    {                                                                                                                   \
-                         m->buckets[idx].state = ZMAP_EMPTY; return;                                                                    \
-                    }                                                                                                                   \
-                    size_t next_dist = zmap_dist(next, m->capacity, m->buckets[next].stored_hash, m->bits);                             \
-                    if (next_dist == 0)                                                                                                 \
-                    {                                                                                                                   \
-                         m->buckets[idx].state = ZMAP_EMPTY; return;                                                                    \
-                    }                                                                                                                   \
-                    m->buckets[idx] = m->buckets[next];                                                                                 \
-                    idx = next;                                                                                                         \
-                }                                                                                                                       \
-            }                                                                                                                           \
-            idx = (idx + 1) & (m->capacity - 1); dist++;                                                                                \
-        }                                                                                                                               \
-    }                                                                                                                                   \
-                                                                                                                                        \
-    static inline size_t map_size_stable_##Name(map_stable_##Name *m) { return m->count; }                                              \
-    static inline void map_clear_stable_##Name(map_stable_##Name *m)                                                                    \
-    {                                                                                                                                   \
-        if (m->capacity > 0)                                                                                                            \
-        {                                                                                                                               \
-            for (size_t i = 0; i < m->capacity; i++) if (m->buckets[i].state == ZMAP_OCCUPIED) Z_MAP_FREE(m->buckets[i].value);         \
-            memset(m->buckets, 0, m->capacity * sizeof(zmap_bucket_stable_##Name));                                                     \
-        }                                                                                                                               \
-        m->count = 0;                                                                                                                   \
-    }                                                                                                                                   \
-                                                                                                                                        \
-    static inline zmap_iter_stable_##Name map_iter_init_stable_##Name(map_stable_##Name *m) { return (zmap_iter_stable_##Name){m, 0}; } \
-                                                                                                                                        \
-    static inline bool map_iter_next_stable_##Name(zmap_iter_stable_##Name *it, KeyT *k, ValT *v)                                       \
-    {                                                                                                                                   \
-        if(!it->map || !it->map->buckets) return false;                                                                                 \
-        while(it->index < it->map->capacity)                                                                                            \
-        {                                                                                                                               \
-            size_t i = it->index++;                                                                                                     \
-            if(it->map->buckets[i].state == ZMAP_OCCUPIED)                                                                              \
-            {                                                                                                                           \
-                if(k) *k = it->map->buckets[i].key;                                                                                     \
-                if(v) *v = *it->map->buckets[i].value;                                                                                  \
-                return true;                                                                                                            \
-            }                                                                                                                           \
-        } return false;                                                                                                                 \
+// Dispatch entries.
+#define M_PUT_ENTRY(K, V, N)     zmap_##N*: zmap_put_##N,
+#define M_GET_ENTRY(K, V, N)     zmap_##N*: zmap_get_##N,
+#define M_REM_ENTRY(K, V, N)     zmap_##N*: zmap_remove_##N,
+#define M_FREE_ENTRY(K, V, N)    zmap_##N*: zmap_free_##N,
+#define M_SIZE_ENTRY(K, V, N)    zmap_##N*: zmap_size_##N,
+#define M_CLEAR_ENTRY(K, V, N)   zmap_##N*: zmap_clear_##N,
+#define M_SEED_ENTRY(K, V, N)    zmap_##N*: zmap_set_seed_##Name,
+#define M_ITER_INIT(K, V, N)     zmap_##N*: zmap_iter_init_##Name,
+#define M_ITER_NEXT(K, V, N)     zmap_iter_##N*: zmap_iter_next_##Name,
+
+#define S_PUT_ENTRY(K, V, N)     zmap_stable_##N*: zmap_put_stable_##N,
+#define S_GET_ENTRY(K, V, N)     zmap_stable_##N*: zmap_get_stable_##N,
+#define S_REM_ENTRY(K, V, N)     zmap_stable_##N*: zmap_remove_stable_##Name,
+#define S_FREE_ENTRY(K, V, N)    zmap_stable_##N*: zmap_free_stable_##Name,
+#define S_SIZE_ENTRY(K, V, N)    zmap_stable_##N*: zmap_size_stable_##Name,
+#define S_CLEAR_ENTRY(K, V, N)   zmap_stable_##N*: zmap_clear_stable_##Name,
+#define S_SEED_ENTRY(K, V, N)    zmap_stable_##N*: zmap_set_seed_stable_##Name,
+#define S_ITER_INIT(K, V, N)     zmap_stable_##N*: zmap_iter_init_stable_##Name,
+#define S_ITER_NEXT(K, V, N)     zmap_iter_stable_##N*: zmap_iter_next_stable_##Name,
+
+#if Z_HAS_ZERROR
+    static inline zres zmap_err_dummy(void* v, ...) 
+    { 
+        return zres_err(zerr_create(-1, "Unknown Map Type")); 
     }
-
-/* Registry and dispatch. */
-
-/* Registry Hooks. */
-#if defined(__has_include) && __has_include("z_registry.h")
-    #include "z_registry.h"
+    
+#   define M_PUT_SAFE_ENTRY(K, V, N) zmap_##N*: zmap_put_safe_##N,
+#   define M_GET_SAFE_ENTRY(K, V, N) zmap_##N*: zmap_get_safe_##N,
 #endif
 
-#ifndef REGISTER_MAP_TYPES
-    #define REGISTER_MAP_TYPES(X)
+// Registry Hooks.
+#ifndef REGISTER_ZMAP_TYPES
+#   if defined(__has_include) && __has_include("z_registry.h")
+#       include "z_registry.h"
+#   endif
 #endif
-#ifndef REGISTER_STABLE_MAPS
-    #define REGISTER_STABLE_MAPS(X)
+
+#ifndef REGISTER_ZMAP_TYPES
+#   define REGISTER_ZMAP_TYPES(X)
 #endif
+
 #ifndef Z_AUTOGEN_MAPS
-    #define Z_AUTOGEN_MAPS(X)
-#endif
-#ifndef Z_AUTOGEN_STABLE_MAPS
-    #define Z_AUTOGEN_STABLE_MAPS(X)
+#   define Z_AUTOGEN_MAPS(X)
 #endif
 
-// Master Lists.
-#define Z_ALL_MAPS(X)        Z_AUTOGEN_MAPS(X)        REGISTER_MAP_TYPES(X)
+#ifndef REGISTER_STABLE_MAPS
+#   define REGISTER_STABLE_MAPS(X)
+#endif
+
+#ifndef Z_AUTOGEN_STABLE_MAPS
+#   define Z_AUTOGEN_STABLE_MAPS(X)
+#endif
+
+// Master List.
+#define Z_ALL_MAPS(X)        Z_AUTOGEN_MAPS(X)        REGISTER_ZMAP_TYPES(X)
 #define Z_ALL_STABLE_MAPS(X) Z_AUTOGEN_STABLE_MAPS(X) REGISTER_STABLE_MAPS(X)
 
 // Generate defs.
-Z_ALL_MAPS(Z_MAP_GENERATE_IMPL)
-Z_ALL_STABLE_MAPS(Z_MAP_GENERATE_STABLE_IMPL)
+Z_ALL_MAPS(ZMAP_GENERATE_IMPL)
+Z_ALL_STABLE_MAPS(ZMAP_GENERATE_STABLE_IMPL)
 
-// Dispatch entries (Standard).
-#define M_PUT_ENTRY(K, V, N)     map_##N*: map_put_##N,
-#define M_GET_ENTRY(K, V, N)     map_##N*: map_get_##N,
-#define M_REM_ENTRY(K, V, N)     map_##N*: map_remove_##N,
-#define M_FREE_ENTRY(K, V, N)    map_##N*: map_free_##N,
-#define M_SIZE_ENTRY(K, V, N)    map_##N*: map_size_##N,
-#define M_CLEAR_ENTRY(K, V, N)   map_##N*: map_clear_##N,
-#define M_SEED_ENTRY(K, V, N)    map_##N*: map_set_seed_##Name,
-#define M_ITER_INIT(K, V, N)     map_##N*: map_iter_init_##Name,
-#define M_ITER_NEXT(K, V, N)     zmap_iter_##N*: map_iter_next_##Name,
-
-// Dispatch entries (Stable).
-#define S_PUT_ENTRY(K, V, N)     map_stable_##N*: map_put_stable_##N,
-#define S_GET_ENTRY(K, V, N)     map_stable_##N*: map_get_stable_##N,
-#define S_REM_ENTRY(K, V, N)     map_stable_##N*: map_remove_stable_##Name,
-#define S_FREE_ENTRY(K, V, N)    map_stable_##N*: map_free_stable_##Name,
-#define S_SIZE_ENTRY(K, V, N)    map_stable_##N*: map_size_stable_##Name,
-#define S_CLEAR_ENTRY(K, V, N)   map_stable_##N*: map_clear_stable_##Name,
-#define S_SEED_ENTRY(K, V, N)    map_stable_##N*: map_set_seed_stable_##Name,
-#define S_ITER_INIT(K, V, N)     map_stable_##N*: map_iter_init_stable_##Name,
-#define S_ITER_NEXT(K, V, N)     zmap_iter_stable_##N*: map_iter_next_stable_##Name,
-
-/* API Macros - auto-detects variant via _Generic. */
-#define map_init(Name, h, c)        map_init_##Name(h, c)
-#define map_init_stable(Name, h, c) map_init_stable_##Name(h, c)
+// API Macros.
+#define zmap_init(Name, h, c)        zmap_init_##Name(h, c)
+#define zmap_init_stable(Name, h, c) zmap_init_stable_##Name(h, c)
 
 #if defined(Z_HAS_CLEANUP) && Z_HAS_CLEANUP
-    #define map_autofree(Name)  Z_CLEANUP(map_free_##Name) map_##Name
+#   define zmap_autofree(Name)          Z_CLEANUP(zmap_free_##Name) zmap_##Name
+#   define zmap_autofree_stable(Name)   Z_CLEANUP(zmap_free_stable_##Name) zmap_stable_##Name
 #endif
 
 // Generic API Methods.
-#define map_put(m, k, v)   _Generic((m), Z_ALL_MAPS(M_PUT_ENTRY)  Z_ALL_STABLE_MAPS(S_PUT_ENTRY)  default: 0)(m, k, v)
-#define map_get(m, k)      _Generic((m), Z_ALL_MAPS(M_GET_ENTRY)  Z_ALL_STABLE_MAPS(S_GET_ENTRY)  default: (void*)0)(m, k)
-#define map_remove(m, k)   _Generic((m), Z_ALL_MAPS(M_REM_ENTRY)  Z_ALL_STABLE_MAPS(S_REM_ENTRY)  default: (void)0)(m, k)
-#define map_free(m)        _Generic((m), Z_ALL_MAPS(M_FREE_ENTRY) Z_ALL_STABLE_MAPS(S_FREE_ENTRY) default: (void)0)(m)
-#define map_size(m)        _Generic((m), Z_ALL_MAPS(M_SIZE_ENTRY) Z_ALL_STABLE_MAPS(S_SIZE_ENTRY) default: 0)(m)
-#define map_clear(m)       _Generic((m), Z_ALL_MAPS(M_CLEAR_ENTRY)Z_ALL_STABLE_MAPS(S_CLEAR_ENTRY)default: (void)0)(m)
-#define map_set_seed(m, s) _Generic((m), Z_ALL_MAPS(M_SEED_ENTRY) Z_ALL_STABLE_MAPS(S_SEED_ENTRY) default: (void)0)(m, s)
+#define zmap_put(m, k, v)   _Generic((m), Z_ALL_MAPS(M_PUT_ENTRY)  Z_ALL_STABLE_MAPS(S_PUT_ENTRY)  default: 0)(m, k, v)
+#define zmap_get(m, k)      _Generic((m), Z_ALL_MAPS(M_GET_ENTRY)  Z_ALL_STABLE_MAPS(S_GET_ENTRY)  default: (void*)0)(m, k)
+#define zmap_remove(m, k)   _Generic((m), Z_ALL_MAPS(M_REM_ENTRY)  Z_ALL_STABLE_MAPS(S_REM_ENTRY)  default: (void)0)(m, k)
+#define zmap_free(m)        _Generic((m), Z_ALL_MAPS(M_FREE_ENTRY) Z_ALL_STABLE_MAPS(S_FREE_ENTRY) default: (void)0)(m)
+#define zmap_size(m)        _Generic((m), Z_ALL_MAPS(M_SIZE_ENTRY) Z_ALL_STABLE_MAPS(S_SIZE_ENTRY) default: 0)(m)
+#define zmap_clear(m)       _Generic((m), Z_ALL_MAPS(M_CLEAR_ENTRY)Z_ALL_STABLE_MAPS(S_CLEAR_ENTRY)default: (void)0)(m)
+#define zmap_set_seed(m, s) _Generic((m), Z_ALL_MAPS(M_SEED_ENTRY) Z_ALL_STABLE_MAPS(S_SEED_ENTRY) default: (void)0)(m, s)
+
+// Safe API Macros.
+#if Z_HAS_ZERROR
+#   define zmap_put_safe(m, k, v) \
+        _Generic((m), Z_ALL_MAPS(M_PUT_SAFE_ENTRY) default: zmap_err_dummy)(m, k, v, __FILE__, __LINE__, __func__)
+    
+#   define zmap_get_safe(m, k) \
+        _Generic((m), Z_ALL_MAPS(M_GET_SAFE_ENTRY) default: zmap_err_dummy)(m, k, __FILE__, __LINE__, __func__)
+#endif
 
 // Iterators.
-#define map_iter_init(Name, m) _Generic((m),        \
-    map_##Name*: map_iter_init_##Name,              \
-    map_stable_##Name*: map_iter_init_stable_##Name \
-)(m)
+#define zmap_iter_init(Name, m) _Generic((m), Z_ALL_MAPS(M_ITER_INIT) Z_ALL_STABLE_MAPS(S_ITER_INIT) default: 0)(m)
+#define zmap_iter_next(it, k, v) _Generic((it), Z_ALL_MAPS(M_ITER_NEXT) Z_ALL_STABLE_MAPS(S_ITER_NEXT) default: false)(it, k, v)
 
-#define map_iter_next(it, k, v) _Generic((it),      \
-    Z_ALL_MAPS(M_ITER_NEXT)                         \
-    Z_ALL_STABLE_MAPS(S_ITER_NEXT)                  \
-    default: false)(it, k, v)
+// Optional short names.
+#ifdef ZMAP_SHORT_NAMES
+#   define map(Name)           zmap_##Name
+#   define map_stable(Name)    zmap_stable_##Name
+#   define map_init            zmap_init
+#   define map_init_stable     zmap_init_stable 
+#   define map_autofree        zmap_autofree
+#   define map_autofree_stable zmap_autofree_stable
+#   define map_put             zmap_put
+#   define map_get             zmap_get
+#   define map_remove          zmap_remove
+#   define map_free            zmap_free
+#   define map_size            zmap_size
+#   define map_clear           zmap_clear
+#   define map_set_seed        zmap_set_seed
+    
+#   define map_iter_init       zmap_iter_init
+#   define map_iter_next       zmap_iter_next
+
+#   if Z_HAS_ZERROR
+#       define map_put_safe    zmap_put_safe
+#       define map_get_safe    zmap_get_safe
+#   endif
+#endif
 
 #ifdef __cplusplus
 } // extern "C"
 
-// C++ Traits Generation.
 namespace z_map
 {
     // C++ traits for standard maps.
     #define ZMAP_CPP_TRAITS(Key, Val, Name)                                 \
         template<> struct traits<Key, Val>                                  \
         {                                                                   \
-            using map_type = map_##Name;                                    \
-            using bucket_type = zmap_bucket_##Name;                         \
-            static constexpr auto init = map_init_ext_##Name;               \
-            static constexpr auto put = map_put_##Name;                     \
-            static constexpr auto get = map_get_##Name;                     \
-            static constexpr auto remove = map_remove_##Name;               \
-            static constexpr auto clear = map_clear_##Name;                 \
-            static constexpr auto free = map_free_##Name;                   \
-            static constexpr auto set_seed = map_set_seed_##Name;           \
+            using map_type = ::zmap_##Name;                                 \
+            using bucket_type = ::zmap_bucket_##Name;                       \
+            static constexpr auto init = ::zmap_init_ext_##Name;            \
+            static constexpr auto put = ::zmap_put_##Name;                  \
+            static constexpr auto get = ::zmap_get_##Name;                  \
+            static constexpr auto remove = ::zmap_remove_##Name;            \
+            static constexpr auto clear = ::zmap_clear_##Name;              \
+            static constexpr auto free = ::zmap_free_##Name;                \
+            static constexpr auto set_seed = ::zmap_set_seed_##Name;        \
         };
 
     Z_ALL_MAPS(ZMAP_CPP_TRAITS)

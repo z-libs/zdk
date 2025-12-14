@@ -825,9 +825,9 @@ Z_ALL_VECS(ZVEC_GENERATE_IMPL)
 
 // Public convenience macros.
 
-#define zvec_from(Name, ...)                                                            \
-    zvec_from_array_##Name((zvec_T_##Name[])__VA_ARGS__,                                \
-                           sizeof((zvec_T_##Name[])__VA_ARGS__) / sizeof(zvec_T_##Name))
+#define zvec_from(Name, ...)                                                                \
+    zvec_from_array_##Name((zvec_T_##Name[]){__VA_ARGS__},                                  \
+                           sizeof((zvec_T_##Name[]){__VA_ARGS__}) / sizeof(zvec_T_##Name))
 
 #define zvec_init(Name)           zvec_init_capacity_##Name(0)
 #define zvec_init_with_cap(Name, cap) zvec_init_capacity_##Name(cap)
