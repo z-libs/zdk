@@ -15,6 +15,7 @@
     "zops.h",
     "zrand.h",
     "zstr.h",
-    "zvec.h"
+    "zvec.h",
+    "zthread.h"
   ]
 }

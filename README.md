@@ -9,15 +9,16 @@ It is designed to provide a "Standard Library Extension" experience, offering es
 
 | Library | Description | Included in `zworld.h`? |
 | :--- | :--- | :---: |
-| **zvec.h** | Type-safe generic vector (dynamic array). | Yes |
-| **zmap.h** | Type-safe generic hash map. | Yes |
-| **zlist.h** | Type-safe generic doubly linked list. | Yes |
-| **zmath.h** | Fast, software-based math library (vectors, matrices, trig). | Yes |
-| **zstr.h** | Modern string library with small string optimization (SSO) and Views. | Yes |
-| **zrand.h** | Pseudo-random number generation utilities. | Yes |
-| **zerror.h** | Result types (`Result<T,E>`) and stack tracing. | No |
-| **zalloc.h** | Custom memory allocator wrappers and tracking. | No |
-| **zops.h** | polymorphic API that glues the rest of `z-libs` | No |
+| **zvec.h**    | Type-safe generic vector (dynamic array). | Yes |
+| **zmap.h**    | Type-safe generic hash map. | Yes |
+| **zlist.h**   | Type-safe generic doubly linked list. | Yes |
+| **zmath.h**   | Fast, software-based math library (vectors, matrices, trig). | Yes |
+| **zstr.h**    | Modern string library with small string optimization (SSO) and Views. | Yes |
+| **zrand.h**   | Pseudo-random number generation utilities. | Yes |
+| **zthread.h** | Type-safe, cross-platform threading and synchronization library. | Yes |
+| **zerror.h**  | Result types (`Result<T,E>`) and stack tracing. | No |
+| **zalloc.h**  | Custom memory allocator wrappers and tracking. | No |
+| **zops.h**    | polymorphic API that glues the rest of `z-libs` | No |
 
 ## Installation
 
