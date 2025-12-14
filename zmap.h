@@ -158,8 +158,8 @@
  *
  * License: MIT
  * Author: Zuhaitz
- * Repository: https://github.com/z-libs/zmap
- * Version: 1.0.0
+ * Repository: https://github.com/z-libs/zmap.h
+ * Version: 1.0.1
  */
 
 #ifndef ZMAP_H

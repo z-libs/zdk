@@ -157,8 +157,8 @@
  *
  * License: MIT
  * Author: Zuhaitz
- * Repository: https://github.com/z-libs/zlist
- * Version: 1.0.0
+ * Repository: https://github.com/z-libs/zlist.h
+ * Version: 1.0.1
  */
 
 #ifndef ZLIST_H

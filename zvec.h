@@ -157,8 +157,8 @@
  *
  * License: MIT
  * Author: Zuhaitz
- * Repository: https://github.com/z-libs/zvec
- * Version: 1.0.1
+ * Repository: https://github.com/z-libs/zvec.h
+ * Version: 1.0.2
  */
 
 #ifndef ZVEC_H
