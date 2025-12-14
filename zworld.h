@@ -9,5 +9,6 @@
 #include "zstr.h"
 #include "zrand.h"
 #include "zmath.h"
+#include "zthread.h"
 
 #endif // ZWORLD_H
