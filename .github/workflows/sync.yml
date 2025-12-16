@@ -18,7 +18,7 @@ jobs:
       - name: Download Headers
         run: |
           # 1. Download EVERYTHING for the package
-          libs=( "zvec" "zlist" "zmap" "zstr" "zalloc" "zops" "zerror" "zrand" "zmath" "zthread" )
+          libs=( "zvec" "zlist" "zmap" "zstr" "zalloc" "zops" "zerror" "zrand" "zmath" "zthread" "ztree")
           BASE_URL="https://raw.githubusercontent.com/z-libs"
           
           echo "Fetching latest headers..."
