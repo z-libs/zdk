@@ -996,22 +996,67 @@ Z_ALL_LISTS(ZLIST_GENERATE_IMPL)
 #define zlist_tail(l)               _Generic((l),    Z_ALL_LISTS(L_TAIL_ENTRY)    default: (void*)0)  (l)
 #define zlist_at(l, idx)            _Generic((l),    Z_ALL_LISTS(L_AT_ENTRY)      default: (void*)0)  (l, idx)
 
-// Iteration helper (C only).
-#define zlist_foreach(l, iter) \
-    for ((iter) = (l)->head; (iter) != NULL; (iter) = (iter)->next)
+/* * Explicit declaration macros (Standard C99/C11)
+ * These declare the iterator variable for you, but require the type name.
+ * Usage: zlist_foreach_decl(Int, &list, n) { ... }
+ */
+#define zlist_foreach_decl(Name, l, iter) \
+    for (zlist_node_##Name *iter = (l)->head; iter != NULL; iter = iter->next)
 
-#define zlist_foreach_safe(l, iter, safe_iter)                              \
-    for ((iter) = (l)->head, (safe_iter) = (iter) ? (iter)->next : NULL;    \
-         (iter) != NULL;                                                    \
-         (iter) = (safe_iter), (safe_iter) = (iter) ? (iter)->next : NULL)
+#define zlist_foreach_safe_decl(Name, l, iter, safe)                            \
+    for (zlist_node_##Name *iter = (l)->head, *safe = iter ? iter->next : NULL; \
+         iter != NULL;                                                          \
+         iter = safe, safe = iter ? iter->next : NULL)
 
-#define zlist_foreach_rev(l, iter) \
-    for ((iter) = (l)->tail; (iter) != NULL; (iter) = (iter)->prev)
+#define zlist_foreach_rev_decl(Name, l, iter) \
+    for (zlist_node_##Name *iter = (l)->tail; iter != NULL; iter = iter->prev)
 
-#define zlist_foreach_rev_safe(l, iter, safe_iter)                              \
-    for ((iter) = (l)->tail, (safe_iter) = (iter) ? (iter)->prev : NULL;        \
-         (iter) != NULL;                                                        \
-         (iter) = (safe_iter), (safe_iter) = (iter) ? (iter)->prev : NULL)
+#define zlist_foreach_rev_safe_decl(Name, l, iter, safe)                        \
+    for (zlist_node_##Name *iter = (l)->tail, *safe = iter ? iter->prev : NULL; \
+         iter != NULL;                                                          \
+         iter = safe, safe = iter ? iter->prev : NULL)
+
+
+/* * Smart iteration helpers (auto-inference)
+ * GCC/Clang: Automatically declares the iterator variable using '__typeof__'.
+ * MSVC/StdC: Requires the iterator variable to be declared beforehand.
+ */
+#if defined(__GNUC__) || defined(__clang__)
+
+#   define zlist_foreach(l, iter) \
+        for (__typeof__((l)->head) iter = (l)->head; (iter) != NULL; (iter) = (iter)->next)
+
+#   define zlist_foreach_safe(l, iter, safe_iter)                                               \
+        for (__typeof__((l)->head) iter = (l)->head, safe_iter = (iter) ? (iter)->next : NULL;  \
+             (iter) != NULL;                                                                    \
+             (iter) = (safe_iter), (safe_iter) = (iter) ? (iter)->next : NULL)
+
+#   define zlist_foreach_rev(l, iter) \
+        for (__typeof__((l)->tail) iter = (l)->tail; (iter) != NULL; (iter) = (iter)->prev)
+
+#   define zlist_foreach_rev_safe(l, iter, safe_iter)                                           \
+        for (__typeof__((l)->tail) iter = (l)->tail, safe_iter = (iter) ? (iter)->prev : NULL;  \
+             (iter) != NULL;                                                                    \
+             (iter) = (safe_iter), (safe_iter) = (iter) ? (iter)->prev : NULL)
+
+#else
+#   define zlist_foreach(l, iter) \
+        for ((iter) = (l)->head; (iter) != NULL; (iter) = (iter)->next)
+
+#   define zlist_foreach_safe(l, iter, safe_iter)                               \
+        for ((iter) = (l)->head, (safe_iter) = (iter) ? (iter)->next : NULL;    \
+             (iter) != NULL;                                                    \
+             (iter) = (safe_iter), (safe_iter) = (iter) ? (iter)->next : NULL)
+
+#   define zlist_foreach_rev(l, iter) \
+        for ((iter) = (l)->tail; (iter) != NULL; (iter) = (iter)->prev)
+
+#   define zlist_foreach_rev_safe(l, iter, safe_iter)                           \
+        for ((iter) = (l)->tail, (safe_iter) = (iter) ? (iter)->prev : NULL;    \
+             (iter) != NULL;                                                    \
+             (iter) = (safe_iter), (safe_iter) = (iter) ? (iter)->prev : NULL)
+
+#endif
 
 // Safe API macros (conditioned on zerror.h).
 #if Z_HAS_ZERROR
@@ -1041,26 +1086,31 @@ Z_ALL_LISTS(ZLIST_GENERATE_IMPL)
 
 // Optional short names.
 #ifdef ZLIST_SHORT_NAMES
-#   define list_init             zlist_init
-#   define list_autofree         zlist_autofree
-#   define list_push_back        zlist_push_back
-#   define list_push_front       zlist_push_front
-#   define list_insert_after     zlist_insert_after
-#   define list_pop_back         zlist_pop_back
-#   define list_pop_front        zlist_pop_front
-#   define list_remove_node      zlist_remove_node
-#   define list_clear            zlist_clear
-#   define list_splice           zlist_splice
-#   define list_head             zlist_head
-#   define list_tail             zlist_tail
-#   define list_at               zlist_at
-#   define list_foreach          zlist_foreach
-#   define list_foreach_safe     zlist_foreach_safe
-#   define list_is_empty         zlist_is_empty
-#   define list_reverse          zlist_reverse
-#   define list_detach_node      zlist_detach_node
-#   define list_foreach_rev      zlist_foreach_rev
-#   define list_foreach_rev_safe zlist_foreach_rev_safe
+#   define list(Name)                   zlist_##Name
+#   define list_init                    zlist_init
+#   define list_autofree                zlist_autofree
+#   define list_push_back               zlist_push_back
+#   define list_push_front              zlist_push_front
+#   define list_insert_after            zlist_insert_after
+#   define list_pop_back                zlist_pop_back
+#   define list_pop_front               zlist_pop_front
+#   define list_remove_node             zlist_remove_node
+#   define list_clear                   zlist_clear
+#   define list_splice                  zlist_splice
+#   define list_head                    zlist_head
+#   define list_tail                    zlist_tail
+#   define list_at                      zlist_at
+#   define list_reverse                 zlist_reverse
+#   define list_detach_node             zlist_detach_node
+#   define list_is_empty                zlist_is_empty
+#   define list_foreach_decl            zlist_foreach_decl 
+#   define list_foreach_safe_decl       zlist_foreach_safe_decl
+#   define list_foreach_rev_decl        zlist_foreach_rev_decl
+#   define list_foreach_rev_safe_decl   zlist_foreach_rev_safe_decl
+#   define list_foreach                 zlist_foreach
+#   define list_foreach_safe            zlist_foreach_safe
+#   define list_foreach_rev             zlist_foreach_rev
+#   define list_foreach_rev_safe        zlist_foreach_rev_safe
 
 #   if Z_HAS_ZERROR
 #       define list_push_back_safe   zlist_push_back_safe

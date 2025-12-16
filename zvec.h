@@ -858,10 +858,33 @@ Z_ALL_VECS(ZVEC_GENERATE_IMPL)
 #define zvec_bsearch(v, k, c)      _Generic((v), Z_ALL_VECS(BSEARCH_ENTRY)       default: (void *)0)(v, k, c)
 #define zvec_lower_bound(v, k, c)  _Generic((v), Z_ALL_VECS(LOWER_BOUND_ENTRY)   default: (void *)0)(v, k, c)
 
-#define zvec_foreach(v, iter)                                                   \
-    for (size_t _i_##__LINE__ = 0;                                              \
-         _i_##__LINE__ < (v)->length && ((iter) = &(v)->data[_i_##__LINE__]);   \
-         ++_i_##__LINE__)
+/* * Explicit declaration macro (portable C99)
+ * Usage: zvec_foreach_decl(Int, &vec, it) { ... }
+ */
+#define zvec_foreach_decl(Name, v, iter)                                        \
+    for (zvec_T_##Name *iter = (v)->data;                                       \
+         iter < (v)->data + (v)->length;                                        \
+         ++iter)
+
+// Smart iteration helpers (auto-inference).
+#if defined(__GNUC__) || defined(__clang__)
+
+    #define zvec_foreach(v, iter)                                               \
+        for (__typeof__((v)->data) iter = (v)->data;                            \
+             iter < (v)->data + (v)->length;                                    \
+             ++iter)
+
+#else
+
+    /* Standard C fallback: User must declare 'iter' before loop.
+     * Usage: int *it; zvec_foreach(&vec, it) { ... }
+     */
+    #define zvec_foreach(v, iter)                                               \
+        for ((iter) = (v)->data;                                                \
+             (iter) < (v)->data + (v)->length;                                  \
+             ++(iter))
+
+#endif
 
 // Safe API dispatch (zerror.h required).
 #if Z_HAS_ZERROR
