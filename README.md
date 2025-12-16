@@ -11,6 +11,7 @@ It is designed to provide a "Standard Library Extension" experience, offering es
 | :--- | :--- | :---: |
 | **zvec.h**    | Type-safe generic vector (dynamic array). | Yes |
 | **zmap.h**    | Type-safe generic hash map. | Yes |
+| **ztree.h**   | Type-safe generic red-black tree. | Yes |
 | **zlist.h**   | Type-safe generic doubly linked list. | Yes |
 | **zmath.h**   | Fast, software-based math library (vectors, matrices, trig). | Yes |
 | **zstr.h**    | Modern string library with small string optimization (SSO) and Views. | Yes |

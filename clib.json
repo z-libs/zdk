@@ -16,6 +16,7 @@
     "zrand.h",
     "zstr.h",
     "zvec.h",
-    "zthread.h"
+    "zthread.h",
+    "ztree.h"
   ]
 }
