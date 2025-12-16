@@ -117,7 +117,7 @@ zerr zerr_wrap(zerr e, const char *fmt, ...);
     }
 
 typedef struct { bool is_ok; zerr err; } zres;
-static inline zres zres_ok(void)    { return (zres){ .is_ok = true }; }
+static inline zres zres_ok(void)    { return (zres){ .is_ok = true, .err = { 0, NULL, NULL, 0, NULL, NULL } }; }
 static inline zres zres_err(zerr e) { return (zres){ .is_ok = false, .err = e }; }
 
 // Some predefined common results.

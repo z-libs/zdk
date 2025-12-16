@@ -139,7 +139,6 @@
 #endif // Z_COMMON_BUNDLED
 /* ============================================================================ */
 
-
 /*
  * zvec.h — Type-safe, zero-overhead dynamic arrays
  * Part of Zen Development Kit (ZDK)
@@ -158,7 +157,7 @@
  * License: MIT
  * Author: Zuhaitz
  * Repository: https://github.com/z-libs/zvec.h
- * Version: 1.0.2
+ * Version: 1.0.3
  */
 
 #ifndef ZVEC_H
@@ -184,6 +183,7 @@
 #include <utility>
 #include <iterator>
 #include <algorithm>
+#include <new>
 
 namespace z_vec
 {
@@ -437,11 +437,10 @@ extern "C" {
 /*
  * Safe API generation (requires zerror.h).
  *
- * When Z_HAS_ZERROR is true, each generated vector type gets safe variants:
- * zvec_push_safe_*, zvec_reserve_safe_*, zvec_pop_safe_*, etc.
- * These return zres/zresult<T> and include file/line/function context.
+ * When Z_HAS_ZERROR is true, each generated vector type gets safe variants.
+ * * MODIFIED: Disabled for C++ to prevent errors with unions containing classes.
  */
-#if Z_HAS_ZERROR
+#if Z_HAS_ZERROR && !defined(__cplusplus)
 
     static inline zerr zvec_err_impl(int code, const char *msg,
                                      const char *file, int line, const char *func)
@@ -521,6 +520,238 @@ extern "C" {
 #   define ZVEC_GEN_SAFE_IMPL(T, Name)
 #endif
 
+// C++ compatibility layers.
+
+#ifdef __cplusplus
+#   define ZVEC_IMPL_ALLOC(T, Name)                                             \
+        static inline int zvec_reserve_##Name(zvec_##Name *v, size_t new_cap)   \
+        {                                                                       \
+            if (new_cap <= v->capacity)                                         \
+            {                                                                   \
+                return Z_OK;                                                    \
+            }                                                                   \
+            try {                                                               \
+                T* new_data = new T[new_cap];                                   \
+                for (size_t i = 0; i < v->length; ++i)                          \
+                {                                                               \
+                    new_data[i] = std::move(v->data[i]);                        \
+                }                                                               \
+                if (v->data)                                                    \
+                {                                                               \
+                    delete[] v->data;                                           \
+                }                                                               \
+                v->data = new_data;                                             \
+                v->capacity = new_cap;                                          \
+            } catch (...) { return Z_ENOMEM; }                                  \
+            return Z_OK;                                                        \
+        }                                                                       \
+                                                                                \
+        static inline void zvec_free_##Name(zvec_##Name *v)                     \
+        {                                                                       \
+            if (v->data)                                                        \
+            {                                                                   \
+                delete[] v->data;                                               \
+            }                                                                   \
+            v->data = NULL;                                                     \
+            v->length = 0;                                                      \
+            v->capacity = 0;                                                    \
+        }                                                                       \
+                                                                                \
+        static inline void zvec_remove_##Name(zvec_##Name *v, size_t index)     \
+        {                                                                       \
+            if (index >= v->length)                                             \
+            {                                                                   \
+                return;                                                         \
+            }                                                                   \
+            for (size_t i = index; i < v->length - 1; ++i)                      \
+            {                                                                   \
+                v->data[i] = std::move(v->data[i + 1]);                         \
+            }                                                                   \
+            v->data[v->length - 1] = T();                                       \
+            v->length--;                                                        \
+        }                                                                       \
+                                                                                \
+        static inline void zvec_shrink_to_fit_##Name(zvec_##Name *v)            \
+        {                                                                       \
+            if (v->length == v->capacity)                                       \
+            {                                                                   \
+                return;                                                         \
+            }                                                                   \
+            if (0 == v->length)                                                 \
+            {                                                                   \
+                zvec_free_##Name(v);                                            \
+                return;                                                         \
+            }                                                                   \
+            try                                                                 \
+            {                                                                   \
+                T* new_data = new T[v->length];                                 \
+                for (size_t i = 0; i < v->length; ++i)                          \
+                {                                                               \
+                    new_data[i] = std::move(v->data[i]);                        \
+                }                                                               \
+                if (v->data) delete[] v->data;                                  \
+                v->data = new_data;                                             \
+                v->capacity = v->length;                                        \
+            }                                                                   \
+            catch (...) {}                                                      \
+        }
+
+    // C++ dispatch: generates inline overloads so C++ can find functions without _Generic.
+#   define ZVEC_CPP_DISPATCH_IMPL(T, Name)                                                  \
+        static inline int zvec_reserve_dispatch(zvec_##Name *v, size_t n)                   \
+        {                                                                                   \
+            return zvec_reserve_##Name(v, n);                                               \
+        }                                                                                   \
+                                                                                            \
+        static inline int zvec_push_dispatch(zvec_##Name *v, T val)                         \
+        {                                                                                   \
+            return zvec_push_##Name(v, val);                                                \
+        }                                                                                   \
+                                                                                            \
+        static inline T* zvec_push_slot_dispatch(zvec_##Name *v)                            \
+        {                                                                                   \
+            return zvec_push_slot_##Name(v);                                                \
+        }                                                                                   \
+                                                                                            \
+        static inline int zvec_extend_dispatch(zvec_##Name *v, const T *arr, size_t n)      \
+        {                                                                                   \
+            return zvec_extend_##Name(v, arr, n);                                           \
+        }                                                                                   \
+                                                                                            \
+        static inline int zvec_is_empty_dispatch(zvec_##Name *v)                            \
+        {                                                                                   \
+            return zvec_is_empty_##Name(v);                                                 \
+        }                                                                                   \
+                                                                                            \
+        static inline T* zvec_at_dispatch(zvec_##Name *v, size_t i)                         \
+        {                                                                                   \
+            return zvec_at_##Name(v, i);                                                    \
+        }                                                                                   \
+                                                                                            \
+        static inline T* zvec_data_dispatch(zvec_##Name *v)                                 \
+        {                                                                                   \
+            return zvec_data_##Name(v);                                                     \
+        }                                                                                   \
+                                                                                            \
+        static inline T* zvec_last_dispatch(zvec_##Name *v)                                 \
+        {                                                                                   \
+            return zvec_last_##Name(v);                                                     \
+        }                                                                                   \
+                                                                                            \
+        static inline void zvec_free_dispatch(zvec_##Name *v)                               \
+        {                                                                                   \
+            zvec_free_##Name(v);                                                            \
+        }                                                                                   \
+                                                                                            \
+        static inline void zvec_pop_dispatch(zvec_##Name *v)                                \
+        {                                                                                   \
+            zvec_pop_##Name(v);                                                             \
+        }                                                                                   \
+                                                                                            \
+        static inline T zvec_pop_get_dispatch(zvec_##Name *v)                               \
+        {                                                                                   \
+            return zvec_pop_get_##Name(v);                                                  \
+        }                                                                                   \
+                                                                                            \
+        static inline void zvec_shrink_to_fit_dispatch(zvec_##Name *v)                      \
+        {                                                                                   \
+            zvec_shrink_to_fit_##Name(v);                                                   \
+        }                                                                                   \
+                                                                                            \
+        static inline void zvec_remove_dispatch(zvec_##Name *v, size_t i)                   \
+        {                                                                                   \
+            zvec_remove_##Name(v, i);                                                       \
+        }                                                                                   \
+                                                                                            \
+        static inline void zvec_swap_remove_dispatch(zvec_##Name *v, size_t i)              \
+        {                                                                                   \
+            zvec_swap_remove_##Name(v, i);                                                  \
+        }                                                                                   \
+                                                                                            \
+        static inline void zvec_clear_dispatch(zvec_##Name *v)                              \
+        {                                                                                   \
+            zvec_clear_##Name(v);                                                           \
+        }                                                                                   \
+                                                                                            \
+        static inline void zvec_reverse_dispatch(zvec_##Name *v)                            \
+        {                                                                                   \
+            zvec_reverse_##Name(v);                                                         \
+        }                                                                                   \
+                                                                                            \
+        static inline void zvec_sort_dispatch(zvec_##Name *v,                               \
+                                              int (*cmp)(const T*, const T*))               \
+        {                                                                                   \
+            zvec_sort_##Name(v, cmp);                                                       \
+        }                                                                                   \
+                                                                                            \
+        static inline T* zvec_bsearch_dispatch(zvec_##Name *v, const T* k,                  \
+                                               int (*cmp)(const T*, const T*))              \
+        {                                                                                   \
+            return zvec_bsearch_##Name(v, k, cmp);                                          \
+        }                                                                                   \
+                                                                                            \
+        static inline T* zvec_lower_bound_dispatch(zvec_##Name *v, const T* k,              \
+                                                   int (*cmp)(const T*, const T*))          \
+        {                                                                                   \
+            return zvec_lower_bound_##Name(v, k, cmp);                                      \
+        }
+#else
+    // C implementation: uses realloc / memmove / free.
+    #define ZVEC_IMPL_ALLOC(T, Name)                                                            \
+        static inline int zvec_reserve_##Name(zvec_##Name *v, size_t new_cap)                   \
+        {                                                                                       \
+            if (new_cap <= v->capacity)                                                         \
+            {                                                                                   \
+                return Z_OK;                                                                    \
+            }                                                                                   \
+            T* new_data = (T*)ZVEC_REALLOC(v->data, new_cap * sizeof(T));                       \
+            if (!new_data)                                                                      \
+            {                                                                                   \
+                return Z_ENOMEM;                                                                \
+            }                                                                                   \
+            v->data = new_data;                                                                 \
+            v->capacity = new_cap;                                                              \
+            return Z_OK;                                                                        \
+        }                                                                                       \
+                                                                                                \
+        static inline void zvec_free_##Name(zvec_##Name *v)                                     \
+        {                                                                                       \
+            ZVEC_FREE(v->data);                                                                 \
+            memset(v, 0, sizeof(zvec_##Name));                                                  \
+        }                                                                                       \
+                                                                                                \
+        static inline void zvec_remove_##Name(zvec_##Name *v, size_t index)                     \
+        {                                                                                       \
+            if (index >= v->length)                                                             \
+            {                                                                                   \
+                return;                                                                         \
+            }                                                                                   \
+            memmove(&v->data[index], &v->data[index + 1], (v->length - index - 1) * sizeof(T)); \
+            v->length--;                                                                        \
+        }                                                                                       \
+                                                                                                \
+        static inline void zvec_shrink_to_fit_##Name(zvec_##Name *v)                            \
+        {                                                                                       \
+            if (v->length == v->capacity)                                                       \
+            {                                                                                   \
+                return;                                                                         \
+            }                                                                                   \
+            if (0 == v->length)                                                                 \
+            {                                                                                   \
+                zvec_free_##Name(v);                                                            \
+                return;                                                                         \
+            }                                                                                   \
+            T* new_data = (T*)ZVEC_REALLOC(v->data, v->length * sizeof(T));                     \
+            if (new_data)                                                                       \
+            {                                                                                   \
+                v->data = new_data;                                                             \
+                v->capacity = v->length;                                                        \
+            }                                                                                   \
+        }
+
+#   define ZVEC_CPP_DISPATCH_IMPL(T, Name) // Empty in C.
+#endif
+
 /*
  * ZVEC_GENERATE_IMPL(T, Name)
  *
@@ -528,9 +759,9 @@ extern "C" {
  *
  * Use manually via:
  * #define REGISTER_ZVEC_TYPES(X)   \
- *      X(int, Int)                 \
- *      X(float, Float)             \
- *      X(MyType, MyType)
+ * X(int, Int)                      \
+ * X(float, Float)                  \
+ * X(MyType, MyType)
  * #include "zvec.h"
  *
  * This creates:
@@ -553,14 +784,18 @@ extern "C" {
         size_t capacity;                                                                    \
     } zvec_##Name;                                                                          \
                                                                                             \
+    /* Forward declaration for C++ allocators to see. */                                    \
+    static inline int zvec_reserve_##Name(zvec_##Name *v, size_t new_cap);                  \
+                                                                                            \
+    ZVEC_IMPL_ALLOC(T, Name)                                                                \
+                                                                                            \
     static inline zvec_##Name zvec_init_capacity_##Name(size_t cap)                         \
     {                                                                                       \
         zvec_##Name v;                                                                      \
         memset(&v, 0, sizeof(zvec_##Name));                                                 \
         if (cap > 0)                                                                        \
         {                                                                                   \
-            v.data = (T *)ZVEC_CALLOC(cap, sizeof(T));                                      \
-            v.capacity = v.data ? cap : 0;                                                  \
+            zvec_reserve_##Name(&v, cap);                                                   \
         }                                                                                   \
         return v;                                                                           \
     }                                                                                       \
@@ -570,26 +805,14 @@ extern "C" {
         zvec_##Name v = zvec_init_capacity_##Name(count);                                   \
         if (v.data)                                                                         \
         {                                                                                   \
-            memcpy(v.data, arr, count * sizeof(T));                                         \
+            size_t i;                                                                       \
+            for(i = 0; i<count; ++i)                                                        \
+            {                                                                               \
+                v.data[i] = arr[i];                                                         \
+            }                                                                               \
             v.length = count;                                                               \
         }                                                                                   \
         return v;                                                                           \
-    }                                                                                       \
-                                                                                            \
-    static inline int zvec_reserve_##Name(zvec_##Name *v, size_t new_cap)                   \
-    {                                                                                       \
-        if (new_cap <= v->capacity)                                                         \
-        {                                                                                   \
-            return Z_OK;                                                                    \
-        }                                                                                   \
-        T *new_data = (T *)ZVEC_REALLOC(v->data, new_cap * sizeof(T));                      \
-        if (!new_data)                                                                      \
-        {                                                                                   \
-            return Z_ENOMEM;                                                                \
-        }                                                                                   \
-        v->data = new_data;                                                                 \
-        v->capacity = new_cap;                                                              \
-        return Z_OK;                                                                        \
     }                                                                                       \
                                                                                             \
     static inline int zvec_is_empty_##Name(zvec_##Name *v)                                  \
@@ -635,7 +858,11 @@ extern "C" {
                 return Z_ENOMEM;                                                            \
             }                                                                               \
         }                                                                                   \
-        memcpy(v->data + v->length, items, count * sizeof(T));                              \
+        size_t i;                                                                           \
+        for( i = 0; i<count; ++i)                                                           \
+        {                                                                                   \
+            v->data[v->length + i] = items[i];                                              \
+        }                                                                                   \
         v->length += count;                                                                 \
         return Z_OK;                                                                        \
     }                                                                                       \
@@ -650,24 +877,6 @@ extern "C" {
     {                                                                                       \
         assert(v->length > 0 && "Vector is empty");                                         \
         return v->data[--v->length];                                                        \
-    }                                                                                       \
-                                                                                            \
-    static inline void zvec_shrink_to_fit_##Name(zvec_##Name *v)                            \
-    {                                                                                       \
-        if (0 == v->length)                                                                 \
-        {                                                                                   \
-            ZVEC_FREE(v->data);                                                             \
-            memset(v, 0, sizeof(zvec_##Name));                                              \
-            return;                                                                         \
-        }                                                                                   \
-        if (v->length == v->capacity)                                                       \
-            return;                                                                         \
-        T *new_data = (T *)ZVEC_REALLOC(v->data, v->length * sizeof(T));                    \
-        if (new_data)                                                                       \
-        {                                                                                   \
-            v->data = new_data;                                                             \
-            v->capacity = v->length;                                                        \
-        }                                                                                   \
     }                                                                                       \
                                                                                             \
     static inline T *zvec_at_##Name(zvec_##Name *v, size_t index)                           \
@@ -685,16 +894,6 @@ extern "C" {
         return (v->length > 0) ? &v->data[v->length - 1] : NULL;                            \
     }                                                                                       \
                                                                                             \
-    static inline void zvec_remove_##Name(zvec_##Name *v, size_t index)                     \
-    {                                                                                       \
-        if (index >= v->length)                                                             \
-        {                                                                                   \
-            return;                                                                         \
-        }                                                                                   \
-        memmove(&v->data[index], &v->data[index + 1], (v->length - index - 1) * sizeof(T)); \
-        v->length--;                                                                        \
-    }                                                                                       \
-                                                                                            \
     static inline void zvec_swap_remove_##Name(zvec_##Name *v, size_t index)                \
     {                                                                                       \
         if (index >= v->length) return;                                                     \
@@ -704,12 +903,6 @@ extern "C" {
     static inline void zvec_clear_##Name(zvec_##Name *v)                                    \
     {                                                                                       \
         v->length = 0;                                                                      \
-    }                                                                                       \
-                                                                                            \
-    static inline void zvec_free_##Name(zvec_##Name *v)                                     \
-    {                                                                                       \
-        ZVEC_FREE(v->data);                                                                 \
-        memset(v, 0, sizeof(zvec_##Name));                                                  \
     }                                                                                       \
                                                                                             \
     static inline void zvec_reverse_##Name(zvec_##Name *v)                                  \
@@ -838,25 +1031,49 @@ Z_ALL_VECS(ZVEC_GENERATE_IMPL)
 
 // Generic dispatch using _Generic.
 
-#define zvec_push(v, val)          _Generic((v), Z_ALL_VECS(PUSH_ENTRY)          default: 0)(v, val)
-#define zvec_push_slot(v)          _Generic((v), Z_ALL_VECS(PUSH_SLOT_ENTRY)     default: (void *)0)(v)
-#define zvec_extend(v, arr, count) _Generic((v), Z_ALL_VECS(EXTEND_ENTRY)        default: 0)(v, arr, count)
-#define zvec_reserve(v, cap)       _Generic((v), Z_ALL_VECS(RESERVE_ENTRY)       default: 0)(v, cap)
-#define zvec_is_empty(v)           _Generic((v), Z_ALL_VECS(IS_EMPTY_ENTRY)      default: 0)(v)
-#define zvec_at(v, idx)            _Generic((v), Z_ALL_VECS(AT_ENTRY)            default: (void *)0)(v, idx)
-#define zvec_data(v)               _Generic((v), Z_ALL_VECS(DATA_ENTRY)          default: (void *)0)(v)
-#define zvec_last(v)               _Generic((v), Z_ALL_VECS(LAST_ENTRY)          default: (void *)0)(v)
-#define zvec_free(v)               _Generic((v), Z_ALL_VECS(FREE_ENTRY)          default: (void)0)(v)
-#define zvec_pop(v)                _Generic((v), Z_ALL_VECS(POP_ENTRY)           default: (void)0)(v)
-#define zvec_pop_get(v)            _Generic((v), Z_ALL_VECS(POP_GET_ENTRY)       default: (void)0)(v)
-#define zvec_shrink_to_fit(v)      _Generic((v), Z_ALL_VECS(SHRINK_ENTRY)        default: (void)0)(v)
-#define zvec_remove(v, i)          _Generic((v), Z_ALL_VECS(REMOVE_ENTRY)        default: (void)0)(v, i)
-#define zvec_swap_remove(v, i)     _Generic((v), Z_ALL_VECS(SWAP_REM_ENTRY)      default: (void)0)(v, i)
-#define zvec_clear(v)              _Generic((v), Z_ALL_VECS(CLEAR_ENTRY)         default: (void)0)(v)
-#define zvec_reverse(v)            _Generic((v), Z_ALL_VECS(REVERSE_ENTRY)       default: (void)0)(v)
-#define zvec_sort(v, cmp)          _Generic((v), Z_ALL_VECS(SORT_ENTRY)          default: (void)0)(v, cmp)
-#define zvec_bsearch(v, k, c)      _Generic((v), Z_ALL_VECS(BSEARCH_ENTRY)       default: (void *)0)(v, k, c)
-#define zvec_lower_bound(v, k, c)  _Generic((v), Z_ALL_VECS(LOWER_BOUND_ENTRY)   default: (void *)0)(v, k, c)
+#ifdef __cplusplus
+    // C++ Overload Dispatch
+#   define zvec_push(v, val)          zvec_push_dispatch(v, val)
+#   define zvec_push_slot(v)          zvec_push_slot_dispatch(v)
+#   define zvec_extend(v, arr, count) zvec_extend_dispatch(v, arr, count)
+#   define zvec_reserve(v, cap)       zvec_reserve_dispatch(v, cap)
+#   define zvec_is_empty(v)           zvec_is_empty_dispatch(v)
+#   define zvec_at(v, idx)            zvec_at_dispatch(v, idx)
+#   define zvec_data(v)               zvec_data_dispatch(v)
+#   define zvec_last(v)               zvec_last_dispatch(v)
+#   define zvec_free(v)               zvec_free_dispatch(v)
+#   define zvec_pop(v)                zvec_pop_dispatch(v)
+#   define zvec_pop_get(v)            zvec_pop_get_dispatch(v)
+#   define zvec_shrink_to_fit(v)      zvec_shrink_to_fit_dispatch(v)
+#   define zvec_remove(v, i)          zvec_remove_dispatch(v, i)
+#   define zvec_swap_remove(v, i)     zvec_swap_remove_dispatch(v, i)
+#   define zvec_clear(v)              zvec_clear_dispatch(v)
+#   define zvec_reverse(v)            zvec_reverse_dispatch(v)
+#   define zvec_sort(v, cmp)          zvec_sort_dispatch(v, cmp)
+#   define zvec_bsearch(v, k, c)      zvec_bsearch_dispatch(v, k, c)
+#   define zvec_lower_bound(v, k, c)  zvec_lower_bound_dispatch(v, k, c)
+#else
+    // C _Generic Dispatch
+#   define zvec_push(v, val)          _Generic((v), Z_ALL_VECS(PUSH_ENTRY)          default: 0)(v, val)
+#   define zvec_push_slot(v)          _Generic((v), Z_ALL_VECS(PUSH_SLOT_ENTRY)     default: (void *)0)(v)
+#   define zvec_extend(v, arr, count) _Generic((v), Z_ALL_VECS(EXTEND_ENTRY)        default: 0)(v, arr, count)
+#   define zvec_reserve(v, cap)       _Generic((v), Z_ALL_VECS(RESERVE_ENTRY)       default: 0)(v, cap)
+#   define zvec_is_empty(v)           _Generic((v), Z_ALL_VECS(IS_EMPTY_ENTRY)      default: 0)(v)
+#   define zvec_at(v, idx)            _Generic((v), Z_ALL_VECS(AT_ENTRY)            default: (void *)0)(v, idx)
+#   define zvec_data(v)               _Generic((v), Z_ALL_VECS(DATA_ENTRY)          default: (void *)0)(v)
+#   define zvec_last(v)               _Generic((v), Z_ALL_VECS(LAST_ENTRY)          default: (void *)0)(v)
+#   define zvec_free(v)               _Generic((v), Z_ALL_VECS(FREE_ENTRY)          default: (void)0)(v)
+#   define zvec_pop(v)                _Generic((v), Z_ALL_VECS(POP_ENTRY)           default: (void)0)(v)
+#   define zvec_pop_get(v)            _Generic((v), Z_ALL_VECS(POP_GET_ENTRY)       default: (void)0)(v)
+#   define zvec_shrink_to_fit(v)      _Generic((v), Z_ALL_VECS(SHRINK_ENTRY)        default: (void)0)(v)
+#   define zvec_remove(v, i)          _Generic((v), Z_ALL_VECS(REMOVE_ENTRY)        default: (void)0)(v, i)
+#   define zvec_swap_remove(v, i)     _Generic((v), Z_ALL_VECS(SWAP_REM_ENTRY)      default: (void)0)(v, i)
+#   define zvec_clear(v)              _Generic((v), Z_ALL_VECS(CLEAR_ENTRY)         default: (void)0)(v)
+#   define zvec_reverse(v)            _Generic((v), Z_ALL_VECS(REVERSE_ENTRY)       default: (void)0)(v)
+#   define zvec_sort(v, cmp)          _Generic((v), Z_ALL_VECS(SORT_ENTRY)          default: (void)0)(v, cmp)
+#   define zvec_bsearch(v, k, c)      _Generic((v), Z_ALL_VECS(BSEARCH_ENTRY)       default: (void *)0)(v, k, c)
+#   define zvec_lower_bound(v, k, c)  _Generic((v), Z_ALL_VECS(LOWER_BOUND_ENTRY)   default: (void *)0)(v, k, c)
+#endif
 
 /* * Explicit declaration macro (portable C99)
  * Usage: zvec_foreach_decl(Int, &vec, it) { ... }
@@ -887,9 +1104,10 @@ Z_ALL_VECS(ZVEC_GENERATE_IMPL)
 #endif
 
 // Safe API dispatch (zerror.h required).
-#if Z_HAS_ZERROR
+#if Z_HAS_ZERROR && !defined(__cplusplus)
     static inline zres zres_err_dummy(void *v, ...) 
-    { 
+    {
+        (void)v; 
         return zres_err(zerr_create(-1, "Unknown vector type")); 
     }
 
@@ -936,7 +1154,7 @@ Z_ALL_VECS(ZVEC_GENERATE_IMPL)
 #   define vec_bsearch            zvec_bsearch
 #   define vec_lower_bound        zvec_lower_bound
 #   define vec_foreach            zvec_foreach
-#   if Z_HAS_ZERROR
+#   if Z_HAS_ZERROR && !defined(__cplusplus)
 #       define vec_reserve_safe   zvec_reserve_safe
 #       define vec_push_safe      zvec_push_safe
 #       define vec_pop_safe       zvec_pop_safe
@@ -947,6 +1165,8 @@ Z_ALL_VECS(ZVEC_GENERATE_IMPL)
 
 #ifdef __cplusplus
 } // extern "C"
+
+Z_ALL_VECS(ZVEC_CPP_DISPATCH_IMPL)
 
 namespace z_vec
 {
