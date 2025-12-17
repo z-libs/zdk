@@ -18,7 +18,7 @@
  * License: MIT
  * Author: Zuhaitz
  * Repository: https://github.com/z-libs/zrand.h
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
 #ifndef ZRAND_H
@@ -275,6 +275,8 @@ namespace z_rand
     };
 }
 #endif // __cplusplus
+
+#endif //ZRAND_H
 
 #ifdef ZRAND_IMPLEMENTATION
 
@@ -585,4 +587,3 @@ int32_t zrand_rng_range(zrand_rng *rng, int32_t min, int32_t max)
 }
 
 #endif // ZRAND_IMPLEMENTATION
-#endif // ZRAND_H
