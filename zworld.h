@@ -10,5 +10,8 @@
 #include "zrand.h"
 #include "zmath.h"
 #include "zthread.h"
+#include "zfile.h"
+#include "zwasm.h"
+#include "znet.h"
 
 #endif // ZWORLD_H
