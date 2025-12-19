@@ -17,9 +17,12 @@ It is designed to provide a "Standard Library Extension" experience, offering es
 | **zstr.h**    | Modern string library with small string optimization (SSO) and Views. | Yes |
 | **zrand.h**   | Pseudo-random number generation utilities. | Yes |
 | **zthread.h** | Type-safe, cross-platform threading and synchronization library. | Yes |
+| **zfile.h**   | Cross-platform file system library.  | Yes |
+| **zwasm.h**   | Freestanding WebAssembly binary generator. | Yes |
+| **znet.h**    | Networking library that unifies TCP, UDP, and HTTP. | Yes |
 | **zerror.h**  | Result types (`Result<T,E>`) and stack tracing. | No |
 | **zalloc.h**  | Custom memory allocator wrappers and tracking. | No |
-| **zops.h**    | polymorphic API that glues the rest of `z-libs` | No |
+| **zops.h**    | Polymorphic API that glues the rest of `z-libs` | No |
 
 ## Installation
 

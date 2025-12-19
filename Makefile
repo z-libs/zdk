@@ -1,5 +1,5 @@
 PROJECT = zdk
-HEADERS = zalloc.h zerror.h zlist.h zmap.h zmath.h zops.h zrand.h zstr.h zvec.h zworld.h zthread.h ztree.h
+HEADERS = zalloc.h zerror.h zlist.h zmap.h zmath.h zops.h zrand.h zstr.h zvec.h zworld.h zthread.h ztree.h zfile.h zwasm.h znet.h
 
 # Install to /usr/include/zdk/ (Standard Linux path)
 PREFIX ?= /usr/local
