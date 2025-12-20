@@ -167,6 +167,8 @@ zstr znet_http_get(const char *domain, const char *path, int timeout_ms);
 #endif // ZNET_H
 
 #ifdef ZNET_IMPLEMENTATION
+#ifndef ZNET_IMPLEMENTATION_GUARD
+#define ZNET_IMPLEMENTATION_GUARD
 
 // Platform adaptation layer.
 
@@ -598,4 +600,5 @@ zstr znet_http_get(const char *domain, const char *path, int timeout_ms)
 }
 #endif
 
+#endif // ZNET_IMPLEMENTATION_GUARD
 #endif // ZNET_IMPLEMENTATION
