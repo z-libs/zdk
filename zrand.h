@@ -18,7 +18,7 @@
  * License: MIT
  * Author: Zuhaitz
  * Repository: https://github.com/z-libs/zrand.h
- * Version: 1.0.1
+ * Version: 1.0.0
  */
 
 #ifndef ZRAND_H
@@ -46,55 +46,105 @@ typedef struct
     uint64_t inc;
 } zrand_rng;
 
-// Global / thread-local API.
+/// @section API Reference (C)
+///
+/// @subsection Global Generation
+/// These functions use a high-performance **thread-local** generator instance. It is automatically seeded from the OS on the first call in each thread.
+///
+/// @group Core Generators
 
 // Re-seeds the thread-local generator from OS entropy.
+/// @private
 void     zrand_init(void); 
 
 // Core generation.
+
+/// Returns a random 32-bit unsigned integer.
 uint32_t zrand_u32(void);
+
+/// Returns a random 64-bit unsigned integer.
 uint64_t zrand_u64(void);
+
+/// Returns a `float` in the range `[0.0, 1.0)` (exclusive).
 float    zrand_f32(void); // 0.0f .. 1.0f (exclusive 1.0).
+
+/// Returns a `double` in the range `[0.0, 1.0)` (exclusive).
 double   zrand_f64(void); // 0.0 .. 1.0 (exclusive 1.0).
+
+/// Returns `true` or `false` (50/50 probability).
 bool     zrand_bool(void);
+
+/// @endgroup
 
 // Utilities.
 
-// Returns integer in [min, max] (inclusive).
+/// @group Utilities
+
+/// Returns `int32_t` in range `[min, max]` (inclusive). Bias-free.
 int32_t  zrand_range(int32_t min, int32_t max);
 
-// Returns float in [min, max).
+/// Returns `float` in range `[min, max)`.
 float   zrand_range_f(float min, float max);
 
-// Returns true "chance" percent of the time (0.0 to 1.0).
+/// Returns `true` if a random check passes the given probability (0.0 to 1.0).
 bool    zrand_chance(double probability);
 
-// Returns a normally distributed double (Box-Muller).
+/// Returns a `double` following a normal distribution.
 double  zrand_gaussian(double mean, double stddev);
 
-// Fills buffer with random bytes.
+/// Fills a buffer with random bytes.
 void    zrand_bytes(void *buf, size_t len);
 
-// Fills buffer with random alphanumeric string (A-Z, a-z, 0-9).
+/// Fills a buffer with a random alphanumeric string (A-Z, a-z, 0-9).
 void    zrand_str(char *buf, size_t len);
 
-// Generates a UUID v4 string (36 chars + null terminator).
+/// Generates a valid **UUID v4** string. `buf` must be at least 37 bytes.
 void    zrand_uuid(char *buf);
 
-// Shuffles an array in-place (Fisher-Yates).
+/// Shuffles an array in-place using Fisher-Yates.
 void    zrand_shuffle(void *base, size_t nmemb, size_t size);
 
-// Returns pointer to a random element in the array.
+/// Returns a `void*` pointer to a random element in the array.
 void* zrand_choice(void *base, size_t nmemb, size_t size);
+
+/// @endgroup
+
+/// @group Management
+
+/// Explicitly re-seeds the current thread's generator from OS entropy (`/dev/urandom` or `rand_s`).
+void     zrand_init(void); 
+
+/// @endgroup
 
 // Instance API (deterministic).
 
+/// @section Instance API (Deterministic)
+/// Use these functions when you need reproducible sequences (e.g., for game replays, procedural generation, or simulations) where the randomness must be identical given the same seed.
+///
+/// @group Management
+
+/// Initializes a specific `zrand_rng` struct. `seq` (sequence) allows different streams from the same seed.
 void     zrand_rng_init(zrand_rng *rng, uint64_t seed, uint64_t seq);
+
+/// @endgroup
+/// @group Generation
+
+/// Helper to generate a 32-bit int from a specific instance.
 uint32_t zrand_rng_u32(zrand_rng *rng);
+
+/// Helper to generate a 64-bit int from a specific instance.
 uint64_t zrand_rng_u64(zrand_rng *rng);
+
+/// Helper to generate a range from a specific instance.
 int32_t  zrand_rng_range(zrand_rng *rng, int32_t min, int32_t max);
+
+/// Helper to generate a double from a specific instance.
 double   zrand_rng_f64(zrand_rng *rng);
+
+/// Helper to generate a gaussian double from a specific instance.
 double   zrand_rng_gaussian(zrand_rng *rng, double mean, double stddev);
+
+/// @endgroup
 
 // Optional short names.
 #ifdef ZRAND_SHORT_NAMES
@@ -127,10 +177,27 @@ double   zrand_rng_gaussian(zrand_rng *rng, double mean, double stddev);
 #include <algorithm>
 #include <stdexcept>
 #include <limits> 
-#include <utility> // for std::swap
 
 namespace z_rand 
 {
+    /// @section API Reference (C++)
+    ///
+    /// The C++ wrapper is defined in the **`z_rand`** namespace.
+    ///
+    /// @table Global Shortcuts
+    /// @row `z_rand::init()` | Wraps `zrand_init`.
+    /// @row `z_rand::u32()`, `u64()` | Returns random integers.
+    /// @row `z_rand::f32()`, `f64()` | Returns random floating point numbers.
+    /// @row `z_rand::boolean()` | Returns boolean.
+    /// @row `z_rand::chance(prob)` | Returns true based on probability.
+    /// @row `z_rand::range(min, max)` | Returns value in range (overloaded for `int` and `float`).
+    /// @row `z_rand::gaussian(mean, std)`| Returns normally distributed value.
+    /// @row `z_rand::uuid()` | Returns a standard `std::string` containing a UUID v4.
+    /// @row `z_rand::string(len)` | Returns a standard `std::string` of random alphanumeric characters.
+    /// @row `z_rand::shuffle(vector)` | Shuffles a `std::vector` (or `z_vec::vector`) in-place.
+    /// @row `z_rand::choice(vector)` | Returns a random element (const ref) from the vector.
+    /// @endgroup
+    
     // Global shortcuts.
     inline void init()
     {
@@ -200,25 +267,30 @@ namespace z_rand
     template<typename T>
     inline void shuffle(std::vector<T> &v) 
     {
-        if (v.size() > 1)
+        if (!v.empty())
         {
-            for (size_t i = v.size() - 1; i > 0; i--) 
-            {
-                size_t j = (size_t)::zrand_range(0, (int32_t)i);
-                std::swap(v[i], v[j]);
-            }
+            ::zrand_shuffle(v.data(), v.size(), sizeof(T));
         }
     }
     
     template<typename T>
     inline const T &choice(const std::vector<T>& v) 
     {
-        if (v.empty())
-        {
-            throw std::runtime_error("z_rand::choice called on empty vector");
-        }
-        return v[::zrand_range(0, (int32_t)v.size() - 1)];
+        const void *ptr = ::zrand_choice((void*)v.data(), v.size(), sizeof(T));
+        return *(const T*)ptr;
     }
+    
+    /// @subsection Deterministic Generator
+    ///
+    /// The `z_rand::generator` class wraps the C struct state (`zrand_rng`). It provides methods matching the global API but operates on its own internal state.
+    ///
+    /// @example cpp
+    /// // Seed 1234, Sequence 1.
+    /// z_rand::generator rng(1234);
+    ///
+    /// int hp = rng.range(50, 100);
+    /// bool has_key = rng.chance(0.25);
+    /// @endexample
 
     // Generator instance (for reproducible seeds).
     class generator 
@@ -596,6 +668,5 @@ int32_t zrand_rng_range(zrand_rng *rng, int32_t min, int32_t max)
     return min + (int32_t)(x / bucket);
 }
 
-#endif // ZRAND_IMPLEMENTATION_GUARD
-
+#endif //ZRAND_IMPLEMENTATION_GUARD
 #endif // ZRAND_IMPLEMENTATION
