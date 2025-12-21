@@ -85,7 +85,7 @@ void    zrand_uuid(char *buf);
 void    zrand_shuffle(void *base, size_t nmemb, size_t size);
 
 // Returns pointer to a random element in the array.
-void*   zrand_choice(void *base, size_t nmemb, size_t size);
+void* zrand_choice(void *base, size_t nmemb, size_t size);
 
 // Instance API (deterministic).
 
@@ -127,6 +127,7 @@ double   zrand_rng_gaussian(zrand_rng *rng, double mean, double stddev);
 #include <algorithm>
 #include <stdexcept>
 #include <limits> 
+#include <utility> // for std::swap
 
 namespace z_rand 
 {
@@ -199,17 +200,24 @@ namespace z_rand
     template<typename T>
     inline void shuffle(std::vector<T> &v) 
     {
-        if (!v.empty())
+        if (v.size() > 1)
         {
-            ::zrand_shuffle(v.data(), v.size(), sizeof(T));
+            for (size_t i = v.size() - 1; i > 0; i--) 
+            {
+                size_t j = (size_t)::zrand_range(0, (int32_t)i);
+                std::swap(v[i], v[j]);
+            }
         }
     }
     
     template<typename T>
     inline const T &choice(const std::vector<T>& v) 
     {
-        const void *ptr = ::zrand_choice((void*)v.data(), v.size(), sizeof(T));
-        return *(const T*)ptr;
+        if (v.empty())
+        {
+            throw std::runtime_error("z_rand::choice called on empty vector");
+        }
+        return v[::zrand_range(0, (int32_t)v.size() - 1)];
     }
 
     // Generator instance (for reproducible seeds).
@@ -276,9 +284,11 @@ namespace z_rand
 }
 #endif // __cplusplus
 
-#endif //ZRAND_H
+#endif // ZRAND_H
 
 #ifdef ZRAND_IMPLEMENTATION
+#ifndef ZRAND_IMPLEMENTATION_GUARD
+#define ZRAND_IMPLEMENTATION_GUARD
 
 #include <stdlib.h>
 #include <string.h>
@@ -585,5 +595,7 @@ int32_t zrand_rng_range(zrand_rng *rng, int32_t min, int32_t max)
     } while (x >= bucket * range);
     return min + (int32_t)(x / bucket);
 }
+
+#endif // ZRAND_IMPLEMENTATION_GUARD
 
 #endif // ZRAND_IMPLEMENTATION

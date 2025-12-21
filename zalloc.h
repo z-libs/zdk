@@ -165,8 +165,6 @@ ZALLOC_API void   zdebug_register_atexit(void);
 
 #endif // ZALLOC_H
 
-/* Implementation. */
-
 #ifdef ZALLOC_IMPLEMENTATION
 
 #include <stdlib.h>
@@ -176,6 +174,8 @@ ZALLOC_API void   zdebug_register_atexit(void);
 
 /* ZARENA. */
 #ifdef ZALLOC_ENABLE_ARENA
+#ifndef ZALLOC_ENABLE_ARENA_GUARD
+#define ZALLOC_ENABLE_ARENA_GUARD
 
 struct zarena_block 
 {
@@ -340,11 +340,14 @@ ZALLOC_API void* zarena_realloc(zarena *a, void *old_ptr, size_t old_size, size_
     if (new_ptr) memcpy(new_ptr, old_ptr, old_size);
     return new_ptr;
 }
+#endif // ZALLOC_ENABLE_ARENA_GUARD
 #endif // ZALLOC_ENABLE_ARENA
 
 
 /* ZPOOL. */
 #ifdef ZALLOC_ENABLE_POOL
+#ifndef ZALLOC_ENABLE_POOL_GUARD
+#define ZALLOC_ENABLE_POOL_GUARD
 
 ZALLOC_API void zpool_init(zpool *p, size_t item_size, size_t items_per_block) 
 {
@@ -417,11 +420,14 @@ ZALLOC_API void zpool_recycle(zpool *p, void *ptr)
     node->next = p->head;
     p->head = node;
 }
+#endif // ZALLOC_ENABLE_POOL_GUARD
 #endif // ZALLOC_ENABLE_POOL
 
 
 /* ZDEBUG. */
 #ifdef ZALLOC_ENABLE_DEBUG
+#ifndef ZALLOC_ENABLE_DEBUG_GUARD
+#define ZALLOC_ENABLE_DEBUG_GUARD
 
 #define ZDEBUG_MAGIC_ALIVE 0x11223344
 #define ZDEBUG_MAGIC_FREED 0xDEADDEAD
@@ -609,6 +615,7 @@ ZALLOC_API size_t zdebug_print_leaks(void)
     ZDEBUG_UNLOCK();
     return count;
 }
+#endif // ZALLOC_ENABLE_DEBUG_GUARD
 #endif // ZALLOC_ENABLE_DEBUG
 
 #endif // ZALLOC_IMPLEMENTATION
