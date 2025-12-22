@@ -146,29 +146,43 @@
 #endif // Z_COMMON_BUNDLED
 /* ============================================================================ */
 
-
 /*
  * zerror.h — Error handling, result types, and panic machinery
  * Part of Zen Development Kit (ZDK)
  *
- * A single-header library for robust error handling in C and C++.
- *
  * Usage:
  * #define ZERROR_IMPLEMENTATION
+ * #define ZERROR_SHORT_NAMES
  * #include "zerror.h"
  *
  * License: MIT
  * Author: Zuhaitz
  * Repository: https://github.com/z-libs/zerror.h
- * Version: 1.1.0
+ * Version: 1.1.1
  */
 
 #ifndef ZERROR_H
 #define ZERROR_H
-// [Bundled] "zcommon.h" is included inline in this same file
+
+// Enable POSIX extensions for localtime_r.
+#if !defined(_POSIX_C_SOURCE) || _POSIX_C_SOURCE < 200809L
+#   undef _POSIX_C_SOURCE
+#   define _POSIX_C_SOURCE 200809L
+#endif
+
+// Include common definitions if available.
+#ifdef __has_include
+#   if __has_include("zcommon.h")
+#       include "zcommon.h"
+#   endif
+#endif
+
 #include <stdio.h>
 #include <stdarg.h>
-#include <errno.h> 
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 
 #ifdef __cplusplus
 #   include <iostream>
@@ -183,13 +197,89 @@
 extern "C" {
 #endif
 
-// Config.
+// Detect typeof support (GCC/Clang extension).
+#ifndef Z_HAS_TYPEOF
+#   if defined(__GNUC__) || defined(__clang__) || defined(__TINYC__)
+#       define Z_HAS_TYPEOF 1
+#       define Z_TYPEOF(x) __typeof__(x)
+#   else
+#       define Z_HAS_TYPEOF 0
+#   endif
+#endif
+
+// Helper macros (Guarded to avoid zcommon.h conflicts).
+#ifndef Z_CONCAT
+#   define Z_CONCAT_IMPL(a, b) a##b
+#   define Z_CONCAT(a, b) Z_CONCAT_IMPL(a, b)
+#endif
+
+#ifndef ZERROR_UID
+#   define ZERROR_UID(prefix) Z_CONCAT(prefix, __LINE__)
+#endif
+
+/// @section API Reference (C)
+///
+/// @section Logging
+/// @table Logging & Debugging
+/// @columns Function / Macro | Description
+/// @row `zlog_init(path, level)` | Initializes logging to a file (optional) and sets min level.
+/// @row `zlog_set_level(level)` | Sets the minimum logging level at runtime.
+/// @row `log_info(...)` | Logs an info message (White).
+/// @row `log_warn(...)` | Logs a warning message (Yellow).
+/// @row `log_error(...)` | Logs an error message (Red).
+/// @row `log_debug(...)` | Logs a debug message (Cyan, if level permits).
+/// @row `log_trace(...)` | Logs a trace message (Blue, if level permits).
+/// @endgroup
+
+// Logging config.
+
+typedef enum 
+{
+    ZLOG_TRACE = 0,
+    ZLOG_DEBUG,
+    ZLOG_INFO,
+    ZLOG_WARN,
+    ZLOG_ERROR,
+    ZLOG_FATAL,
+    ZLOG_NONE
+} zlog_level;
+
+void zlog_init(const char *file_path, zlog_level min_level);
+void zlog_set_level(zlog_level level);
+
+// Internal function.
+void zlog_msg(zlog_level level, const char *file, int line, const char *func, const char *fmt, ...);
+
+// Pleasant macros.
+#define log_trace(...) zlog_msg(ZLOG_TRACE, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define log_debug(...) zlog_msg(ZLOG_DEBUG, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define log_info(...)  zlog_msg(ZLOG_INFO,  __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define log_warn(...)  zlog_msg(ZLOG_WARN,  __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define log_error(...) zlog_msg(ZLOG_ERROR, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define log_fatal(...) zlog_msg(ZLOG_FATAL, __FILE__, __LINE__, __func__, __VA_ARGS__)
+
+// Legacy/caps aliases.
+#define LOG_INFO  log_info
+#define LOG_WARN  log_warn
+#define LOG_ERROR log_error
+#define LOG_DEBUG log_debug
+#define LOG_TRACE log_trace
+#define LOG_FATAL log_fatal
+
+/// @section Error Types
+/// @table Data Structures
+/// @columns Type | Description
+/// @row `zerr` | Base error struct containing code, message, file, line, and trace info.
+/// @row `zres` | Standard void result type (contains `is_ok` and `zerr`).
+/// @row `ResInt` | Typed result carrying an `int` value or an error.
+/// @row `ResPtr` | Typed result carrying a `void*` value or an error.
+/// @endgroup
+
+// Error types.
 
 #ifndef ZERROR_PANIC_ACTION
 #   define ZERROR_PANIC_ACTION() abort()
 #endif
-
-// Base types
 
 typedef struct 
 {
@@ -201,10 +291,22 @@ typedef struct
     const char *source;
 } zerr;
 
+/// @section Error Management
+/// @table Creation & Manipulation
+/// @columns Function | Description
+/// @row `zerr_create(code, msg)` | Creates a new error with current file/line context.
+/// @row `zerr_errno(code, msg)` | Creates a new error, appending the string description of `errno`.
+/// @row `zerr_wrap(e, fmt, ...)` | Wraps an existing error with a new context message.
+/// @row `zerr_print(e)` | Prints a stylized error report to stderr.
+/// @row `zerr_panic(msg)` | Prints a panic message and aborts the program.
+/// @endgroup
+
 zerr zerr_create_impl(int code, const char *file, int line, const char *func, const char *fmt, ...);
 zerr zerr_errno_impl(int code, const char *file, int line, const char *func, const char *fmt, ...);
-zerr zerr_add_trace(zerr e, const char *func, const char *file, int line);
+
 zerr zerr_wrap(zerr e, const char *fmt, ...);
+zerr zerr_add_trace(zerr e, const char *func, const char *file, int line);
+
 void zerr_print(zerr e);
 void zerr_panic(const char *msg, const char *file, int line);
 
@@ -221,14 +323,22 @@ typedef struct
     zerr err; 
 } zres;
 
-static inline zres zres_ok(void)
+static inline zres zres_ok(void) 
 { 
-    return (zres){ .is_ok = true, .err = {0, NULL, NULL, 0, NULL, NULL} }; 
+    return (zres)
+    { 
+        .is_ok = true, 
+        .err = {0, NULL, NULL, 0, NULL, NULL} 
+    }; 
 }
 
 static inline zres zres_err(zerr e) 
 { 
-    return (zres){ .is_ok = false, .err = e }; 
+    return (zres)
+    { 
+        .is_ok = false, 
+        .err = e 
+    }; 
 }
 
 DEFINE_RESULT(int,      ResInt)
@@ -239,10 +349,10 @@ DEFINE_RESULT(size_t,   ResSize)
 DEFINE_RESULT(void*,    ResPtr)
 DEFINE_RESULT(char*,    ResStr)
 
-#if defined(ZERROR_DEBUG) && defined(_MSC_VER)
-#   define ZERROR_TRAP() __debugbreak()
-#elif defined(ZERROR_DEBUG)
+#if defined(ZERROR_DEBUG) && (defined(__GNUC__) || defined(__clang__))
 #   define ZERROR_TRAP() __builtin_trap()
+#elif defined(ZERROR_DEBUG) && defined(_MSC_VER)
+#   define ZERROR_TRAP() __debugbreak()
 #else
 #   define ZERROR_TRAP() ((void)0)
 #endif
@@ -250,30 +360,7 @@ DEFINE_RESULT(char*,    ResStr)
 #define zerr_create(code, ...) (ZERROR_TRAP(), zerr_create_impl((code), __FILE__, __LINE__, __func__, __VA_ARGS__))
 #define zerr_errno(code, ...) (ZERROR_TRAP(), zerr_errno_impl((code), __FILE__, __LINE__, __func__, __VA_ARGS__))
 
-#ifdef ZERROR_ENABLE_TRACE
-#   define ZERROR_TRACE_OP(e) zerr_add_trace(e, __func__, __FILE__, __LINE__)
-#else
-#   define ZERROR_TRACE_OP(e) (e)
-#endif
-
-// Macros.
-
-// Thread local storage detection
-#if defined(__cplusplus) && __cplusplus >= 201103L
-#   define ZERROR_THREAD_LOCAL thread_local
-#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_THREADS__)
-#   define ZERROR_THREAD_LOCAL _Thread_local
-#elif defined(_MSC_VER)
-#   define ZERROR_THREAD_LOCAL __declspec(thread)
-#elif defined(__GNUC__) || defined(__TINYC__) || defined(__clang__)
-#   define ZERROR_THREAD_LOCAL __thread
-#else
-#   define ZERROR_THREAD_LOCAL
-#endif
-
-// Macro generation.
-#define ZERROR_UID(prefix) Z_CONCAT(prefix, __LINE__)
-
+// Runtime helpers
 static inline zerr zerr_with_src(zerr e, const char *src) 
 {
     if (NULL == e.source) 
@@ -283,15 +370,17 @@ static inline zerr zerr_with_src(zerr e, const char *src)
     return e;
 }
 
-// Runtime helper.
+#ifdef ZERROR_ENABLE_TRACE
+#   define ZERROR_TRACE_OP(e) zerr_add_trace(e, __func__, __FILE__, __LINE__)
+#else
+#   define ZERROR_TRACE_OP(e) (e)
+#endif
 
 int zerr_run(zres result);
-
 #define ZERROR_RUN(expr) zerr_run(expr)
 
 // Universal macros.
 
-// Check condition, return error if false.
 #define ZERROR_ENSURE(cond, src, code, msg)         \
     do {                                            \
         if (!(cond))                                \
@@ -302,7 +391,6 @@ int zerr_run(zres result);
         }                                           \
     } while(0)
 
-// Check condition, return typed error if false.
 #define ZERROR_ENSURE_INTO(RetType, cond, src, code, msg)   \
     do {                                                    \
         if (!(cond))                                        \
@@ -313,7 +401,6 @@ int zerr_run(zres result);
         }                                                   \
     } while(0)
 
-// Check integer result from system call (0 is success).
 #define ZERROR_CHECK_SYS(expr, fmt, ...)                            \
     do {                                                            \
         if ((expr) != 0)                                            \
@@ -322,12 +409,10 @@ int zerr_run(zres result);
         }                                                           \
     } while(0)
 
-
-//  Modern macros (Require typeof and statement expressions).
+// Modern macros.
 
 #if Z_HAS_TYPEOF && (!defined(__cplusplus) || defined(__GNUC__))
     
-    // Check result, propagate Error (void/zres return).
 #   define ZERROR_CHECK(expr, src)                                              \
         do {                                                                    \
             Z_TYPEOF(expr) ZERROR_UID(_r) = (expr);                             \
@@ -339,10 +424,9 @@ int zerr_run(zres result);
             }                                                                   \
         } while(0)
 
-    // Check result, propagate Error (typed return conversion).
 #   define ZERROR_CHECK_INTO(RetType, expr, src)                                \
         do {                                                                    \
-            Z_TYPEOF(expr) Z_UID(_r) = (expr);                                  \
+            Z_TYPEOF(expr) ZERROR_UID(_r) = (expr);                             \
             if (!ZERROR_UID(_r).is_ok)                                          \
             {                                                                   \
                 ZERROR_UID(_r).err = zerr_with_src(ZERROR_UID(_r).err, src);    \
@@ -351,7 +435,6 @@ int zerr_run(zres result);
             }                                                                   \
         } while(0)
 
-    // Check result, wrap Error message.
 #   define ZERROR_CHECK_WRAP(expr, src, fmt, ...)                                   \
         do {                                                                        \
             Z_TYPEOF(expr) ZERROR_UID(_r) = (expr);                                 \
@@ -363,7 +446,6 @@ int zerr_run(zres result);
             }                                                                       \
         } while(0)
     
-     // Check result, add context to Error message.
 #   define ZERROR_CHECK_CTX(expr, src, fmt, ...)                                        \
         do {                                                                            \
             Z_TYPEOF(expr) ZERROR_UID(_r) = (expr);                                     \
@@ -376,7 +458,6 @@ int zerr_run(zres result);
             }                                                                           \
         } while(0)
 
-    // Try: evaluate, propagate Error if any, otherwise return value.
 #   define ZERROR_TRY(expr, src)                                                    \
         ({  Z_TYPEOF(expr) ZERROR_UID(_res) = (expr);                               \
             if (!ZERROR_UID(_res).is_ok)                                            \
@@ -388,7 +469,6 @@ int zerr_run(zres result);
             ZERROR_UID(_res).val;                                                   \
         })
 
-    // Try into: evaluate, propagate Error converted to RetType, otherwise return value.
 #   define ZERROR_TRY_INTO(RetType, expr, src)                                      \
         ({  Z_TYPEOF(expr) ZERROR_UID(_res) = (expr);                               \
             if (!ZERROR_UID(_res).is_ok)                                            \
@@ -400,25 +480,6 @@ int zerr_run(zres result);
             ZERROR_UID(_res).val;                                                   \
         })
     
-    // Try ptr: checks if NULL, returns Error if so.
-#   define ZERROR_TRY_PTR(RetType, expr, src, code, msg)    \
-        ({  Z_TYPEOF(expr) ZERROR_UID(_p) = (expr);         \
-            if (NULL == ZERROR_UID(_p))                     \
-            {                                               \
-                zerr _e = zerr_create((code), (msg));       \
-                _e.source = src;                            \
-                return RetType##_err(_e);                   \
-            }                                               \
-            ZERROR_UID(_p);                                 \
-        })
-
-    // Try or: if error, return default.
-#   define ZERROR_TRY_OR(expr, default_val)                                 \
-        ({  Z_TYPEOF(expr) ZERROR_UID(_res) = (expr);                       \
-            ZERROR_UID(_res).is_ok ? ZERROR_UID(_res).val : (default_val);  \
-        })
-    
-    // Expect: evaluate, panic if error, otherwise return value.
 #   define ZERROR_EXPECT(expr, msg)                         \
         ({  Z_TYPEOF(expr) ZERROR_UID(_res) = (expr);       \
             if (!ZERROR_UID(_res).is_ok)                    \
@@ -429,7 +490,6 @@ int zerr_run(zres result);
             ZERROR_UID(_res).val;                           \
         })
 
-    // Defer (cleanup attribute).
 #   define ZERROR_DEFER_HK(l, c)                                \
         void Z_CONCAT(z_defer_fn_, l)(void *_) { (void)_; c; }  \
         __attribute__((cleanup(Z_CONCAT(z_defer_fn_, l))))      \
@@ -439,9 +499,7 @@ int zerr_run(zres result);
 
 #else
     // Strict fallback (Standard C / MSVC).
-    // Note: ZERROR_TRY macros are not supported here because C11 doesn't have 
-    //       statement expressions. You must use CHECK_INTO manually.
-
+    
 #   define ZERROR_CHECK(expr, src)                                      \
         do {                                                            \
             zres ZERROR_UID(_r) = (expr);                               \
@@ -451,13 +509,13 @@ int zerr_run(zres result);
             }                                                           \
         } while(0)
 
-#   define ZERROR_CHECK_INTO(RetType, expr, src)                        \
-        do {                                                            \
-            RetType ZERROR_UID(_r) = (expr);                            \
-            if (!ZERROR_UID(_r).is_ok)                                  \
-            {                                                           \
-                return RetType##_err(ZERROR_TRACE_OP(Z_UID(_r).err));   \
-            }                                                           \
+    #   define ZERROR_CHECK_INTO(RetType, expr, src)                        \
+        do {                                                                \
+            zres ZERROR_UID(_r) = (expr);                                   \
+            if (!ZERROR_UID(_r).is_ok)                                      \
+            {                                                               \
+                return RetType##_err(ZERROR_TRACE_OP(ZERROR_UID(_r).err));  \
+            }                                                               \
         } while(0)
     
 #   define ZERROR_CHECK_WRAP(expr, src, fmt, ...)                                   \
@@ -475,7 +533,7 @@ int zerr_run(zres result);
             if (!ZERROR_UID(_r).is_ok)                                                  \
             {                                                                           \
                 ZERROR_UID(_r).err = zerr_wrap(ZERROR_UID(_r).err, fmt, ##__VA_ARGS__); \
-                return zres_err(Z_UID(_r).err);                                         \
+                return zres_err(ZERROR_UID(_r).err);                                    \
             }                                                                           \
         } while(0)
 
@@ -483,6 +541,20 @@ int zerr_run(zres result);
 
 // Short names.
 #ifdef ZERROR_SHORT_NAMES
+
+    /// @section Macros
+    /// @table Flow Control
+    /// @columns Macro | Description
+    /// @row `check(expr)` | Propagates error for functions returning `zres` or typed results.
+    /// @row `check_into(Type, expr)` | Propagates error, converting it to a `Type` result.
+    /// @row `check_wrap(expr, fmt)` | Propagates error with a wrapping context message.
+    /// @row `try(expr)` | Evaluates `expr`. If error, returns it. Else returns the unwrapped value.
+    /// @row `try_into(Type, expr)` | Same as `try`, but converts the error return type.
+    /// @row `expect(expr, msg)` | Evaluates `expr`. If error, panics with `msg`.
+    /// @row `ensure(cond, code, msg)` | Returns an error if `cond` is false.
+    /// @row `run(expr)` | Executes entry point function (returning `zres`), printing errors on failure.
+    /// @endgroup
+
 #   define check(expr)                  ZERROR_CHECK(expr, #expr)
 #   define check_into(T, expr)          ZERROR_CHECK_INTO(T, expr, #expr)
 #   define check_wrap(expr, ...)        ZERROR_CHECK_WRAP(expr, #expr, __VA_ARGS__)
@@ -493,215 +565,186 @@ int zerr_run(zres result);
 #   define ensure_into(T, c, code, m)   ZERROR_ENSURE_INTO(T, c, #c, code, m)
 
 #   ifdef ZERROR_TRY
-        // "try" is a reserved keyword in C++.
-#       ifdef __cplusplus
-#           define ztry(expr)           ZERROR_TRY(expr, #expr)
-#           define ztry_into(T, expr)   ZERROR_TRY_INTO(T, expr, #expr)
-#           define ztry_ptr(T, p, c, m) ZERROR_TRY_PTR(T, p, #p, c, m)
-#           define ztry_or(e, d)        ZERROR_TRY_OR(e, d)
-#       else
-#           define try(expr)            ZERROR_TRY(expr, #expr)
-#           define try_into(T, expr)    ZERROR_TRY_INTO(T, expr, #expr)
-#           define try_ptr(T, p, c, m)  ZERROR_TRY_PTR(T, p, #p, c, m)
-#           define try_or(e, d)         ZERROR_TRY_OR(e, d)
-#       endif
-
-#       define unwrap(e)                ZERROR_EXPECT(e, "unwrap() failed")
-#       define expect(e, m)             ZERROR_EXPECT(e, m)
+#       define try(expr)            ZERROR_TRY(expr, #expr)
+#       define try_into(T, expr)    ZERROR_TRY_INTO(T, expr, #expr)
+#       define unwrap(expr)         ZERROR_EXPECT(expr, "unwrap() failed")
+#       define expect(e, m)         ZERROR_EXPECT(e, m)
 #   endif
 
 #   ifdef ZERROR_DEFER_HK
-#       define defer(code)              zerr_defer(code)
+#       define defer(code)          zerr_defer(code)
 #   endif
     
-#   define run(e)                       ZERROR_RUN(e)
+#   define run(e)                   ZERROR_RUN(e)
 #endif
 
 #ifdef __cplusplus
 } // extern "C"
 #endif
 
-// --- C++ Integration ---
-
 #ifdef __cplusplus
-inline std::ostream& operator<<(std::ostream& os, const zerr& e) 
+namespace z_log 
 {
-    os << "[!] Error: " << (e.msg ? e.msg : "Unknown");
-    if (e.file) 
-    {
-        os << " at " << e.file << ":" << e.line;
-    }
-    return os;
+    template <typename... Args> inline void info(const char* f, Args... a)  { log_info(f, a...); }
+    template <typename... Args> inline void warn(const char* f, Args... a)  { log_warn(f, a...); }
+    template <typename... Args> inline void error(const char* f, Args... a) { log_error(f, a...); }
+    inline void info(const std::string &s) { log_info("%s", s.c_str()); }
+    inline void error(const std::string &s) { log_error("%s", s.c_str()); }
 }
+
+/// @section API Reference (C++)
+/// 
+/// @section C++ Helpers
+/// @table Namespace z_log
+/// @columns Function | Description
+/// @row `z_log::info(fmt, ...)` | Logs an info message using C-style formatting.
+/// @row `z_log::warn(fmt, ...)` | Logs a warning message using C-style formatting.
+/// @row `z_log::error(fmt, ...)` | Logs an error message using C-style formatting.
+/// @row `z_log::info(str)` | Logs a `std::string` as info.
+/// @row `z_log::error(str)` | Logs a `std::string` as error.
+/// @endgroup
+///
+/// @section Result Type
+/// @table Class z_error::result<T>
+/// @columns Method | Description
+/// @row `result(val)` | Constructors for creating a success result (move or copy).
+/// @row `result(err)` | Constructors for creating a failure result from `zerr` or `zres`.
+/// @row `ok()` | Returns `true` if the result contains a value (success).
+/// @row `unwrap_val()` | Returns the contained value or panics if it is an error.
+/// @row `err` | Public member accessing the underlying `zerr` struct (valid only if !ok()).
+/// @row `operator bool()` | Implicit conversion to boolean (true = success).
+/// @endgroup
+///
+/// @section C++ Macros
+/// @table Shortcuts
+/// @columns Macro | Description
+/// @row `ztry(expr)` | Statement expression that unwraps a `result<T>` or returns the error immediately.
+/// @endgroup
 
 namespace z_error 
 {
-    class error 
-    {
-        ::zerr inner;
-    public:
-        error() : inner{0, nullptr, nullptr, 0, nullptr, nullptr} {}
-        error(::zerr e) : inner(e) {}
-        error(int code, const char *msg) : inner(::zerr_create_impl(code, nullptr, 0, nullptr, "%s", msg)) {}
-        int code() const 
-        { 
-            return inner.code; 
-        }
-
-        operator ::zerr() const 
-        { 
-            return inner; 
-        }
-
-        friend std::ostream &operator<<(std::ostream &os, const error &e) 
-        { 
-            return os << e.inner; 
-        }
-    };
-
-    // Generic Result<T> for C++.
-    template <typename T>
+    template <typename T> 
     class result 
     {
-    public:
-        bool is_ok;
+        bool is_ok_;
         union 
         { 
-            T val; 
-            ::zerr err; 
+            T val_; 
+            ::zerr err_; 
         };
+     public:
+        ::zerr err;
+        result(T &&v) : is_ok_(true), err{} 
+        { 
+            new (&val_) T(std::move(v)); 
+        }
 
-        result(const T &value) : is_ok(true), val(value) {}
-        result(T &&value) : is_ok(true), val(std::move(value)) {}
-        result(::zerr e) : is_ok(false), err(e) {}
-        result(error e) : is_ok(false), err(e) {}
-        
-        result(::zres r) : is_ok(r.is_ok) 
-        {
-            if (!is_ok) 
-            {
-                err = r.err;
-            }
+        result(const T &v) : is_ok_(true), err{} 
+        { 
+            new (&val_) T(v); 
         }
-        
-        template <typename U>
-        result(const result<U> &other) : is_ok(false) 
+    
+        result(::zerr e) : is_ok_(false), err_(e), err(e) {}
+
+        result(::zres r) : is_ok_(false), err{} 
         {
-            if (other.is_ok) 
+            if (r.is_ok) 
             {
-                ::zerr_panic("Attempted to convert success result<U> to error result<T>", __FILE__, __LINE__);
+                ::zerr_panic("Constructed result<T> from zres_ok", __FILE__, __LINE__);
             }
-            err = other.err;
+            err_ = r.err; err = r.err;
         }
-        
-        result(const result &other) : is_ok(other.is_ok) 
+
+        result(result &&other) : is_ok_(other.is_ok_), err(other.err) 
         {
-            if (is_ok) 
+            if (is_ok_) 
             {
-                new (&val) T(other.val); 
+                new (&val_) T(std::move(other.val_)); 
             }
             else 
             {
-                err = other.err;
-            }
-        }
-
-        result(result &&other) noexcept : is_ok(other.is_ok) 
-        {
-            if (is_ok) 
-            {
-                new (&val) T(std::move(other.val)); 
-            }
-            else 
-            {
-                err = other.err;
+                err_ = other.err_;
             }
         }
 
         ~result() 
         { 
-            if (is_ok) 
+            if (is_ok_) 
             {
-                val.~T(); 
+                val_.~T(); 
             }
         }
 
         bool ok() const 
         { 
-            return is_ok; 
-        }
-
-        T &unwrap_val() 
-        { 
-            if (!is_ok) 
-            { 
-                ::zerr_print(err); 
-                ::zerr_panic("unwrap()", __FILE__, __LINE__); 
-            } 
-            return val; 
-        }
-
-        operator ::zerr() const 
-        { 
-            return is_ok ? (::zerr){0, nullptr, nullptr, 0, nullptr, nullptr} : err; 
-        }
-
-        explicit operator bool() const 
-        { 
-            return is_ok; 
-        }
-    };
-
-    template <>
-    class result<void> 
-    {
-    public:
-        bool is_ok;
-        ::zerr err;
-        
-        result() : is_ok(true), err{0, nullptr, nullptr, 0, nullptr, nullptr} {}
-        
-        result(::zerr e) : is_ok(false), err(e) {}
-        result(error e) : is_ok(false), err(e) {}
-        static result<void> success() 
-        { 
-            return result(); 
-        }
-        
-        bool ok() const 
-        { 
-            return is_ok; 
-        }
-
-        result(::zres r) : is_ok(r.is_ok) 
-        {
-            if (!is_ok) 
-            {
-                err = r.err;
-            }
-        }
-
-        template <typename U>
-        result(const result<U> &other) : is_ok(false) 
-        {
-            if (other.is_ok) 
-            {
-                ::zerr_panic("Attempted to convert success result<U> to error result<void>", __FILE__, __LINE__);
-            }
-            err = other.err;
-        }
-
-        operator ::zres() const 
-        { 
-            return { is_ok, err }; 
+            return is_ok_; 
         }
 
         operator bool() const 
         { 
-            return is_ok; 
+            return is_ok_; 
+        }
+
+        T &unwrap_val() 
+        { 
+            if (!is_ok_) 
+            { 
+                ::zerr_print(err_); 
+                abort(); 
+            } 
+            return val_; 
         }
     };
+
+    template <> 
+    class result<void> 
+    {
+        bool is_ok_;
+        ::zerr err_;
+     public:
+        ::zerr err; 
+
+        result() : is_ok_(true), err_{0, NULL, NULL, 0, NULL, NULL}, err{} {}
+
+        result(::zerr e) : is_ok_(false), err_(e), err(e) {}
+
+        result(::zres r) : is_ok_(r.is_ok), err_(r.err), err(r.err) {}
+
+        static result<void> success() 
+        { 
+            return result<void>(); 
+        }
+
+        bool ok() const 
+        { 
+            return is_ok_; 
+        }
+
+        operator bool() const 
+        { 
+            return is_ok_; 
+        }
+
+        void unwrap_val() 
+        { 
+            if (!is_ok_) 
+            { 
+                ::zerr_print(err_);
+                abort(); 
+            } 
+        }
+    };
+    
+    template <typename T> inline result<T> from_c_res(T val) 
+    { 
+        return result<T>(val); 
+    }
 }
+
+#if defined(ZERROR_SHORT_NAMES) && (defined(__GNUC__) || defined(__clang__))
+#   define ztry(expr) ({ auto _r = (expr); if (!_r.ok()) return _r.err; std::move(_r.unwrap_val()); })
+#endif
+
 #endif // __cplusplus
 
 #endif // ZERROR_H
@@ -710,134 +753,267 @@ namespace z_error
 #ifndef ZERROR_IMPLEMENTATION_GUARD
 #define ZERROR_IMPLEMENTATION_GUARD
 
-// Colors.
-#if defined(ZERROR_NO_COLOR)
-#   define ZERROR_COL_RED     ""
-#   define ZERROR_COL_YEL     ""
-#   define ZERROR_COL_GRY     ""
-#   define ZERROR_COL_RST     ""
-#   define ZERROR_COL_BG_RED  ""
+#include <time.h> 
+
+#if defined(_WIN32)
+#   define WIN32_LEAN_AND_MEAN
+#   include <windows.h>
 #else
-#   define ZERROR_COL_RED     "\033[1;31m"
-#   define ZERROR_COL_YEL     "\033[0;33m"
-#   define ZERROR_COL_GRY     "\033[0;90m"
-#   define ZERROR_COL_RST     "\033[0m"
-#   define ZERROR_COL_BG_RED  "\033[41;37m"
+#   include <pthread.h>
+#   include <sys/time.h>
+#   include <unistd.h>
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-static ZERROR_THREAD_LOCAL char z_err_buffers[8][2048]; 
-static ZERROR_THREAD_LOCAL int z_err_idx = 0;
-
-static char* zerr_get_buf(void) 
+static struct 
 {
-    return z_err_buffers[z_err_idx++ & 7];
+    FILE *fp;
+    zlog_level level;
+    bool colors;
+    bool init;
+#   if defined(_WIN32)
+    CRITICAL_SECTION mutex;
+#   else
+    pthread_mutex_t mutex;
+#   endif
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+} zlog__state = { NULL, ZLOG_INFO, true, false };
+#pragma GCC diagnostic pop
+
+static const char *zlog__colors[] = 
+{
+    "\x1b[94m", 
+    "\x1b[36m", 
+    "\x1b[32m", 
+    "\x1b[33m", 
+    "\x1b[31m", 
+    "\x1b[35m"
+};
+
+static const char *zlog__labels[] = 
+{ 
+    "TRACE", 
+    "DEBUG", 
+    "INFO ", 
+    "WARN ", 
+    "ERROR", 
+    "FATAL" 
+};
+
+#if defined(_MSC_VER)
+    static __declspec(thread) char z_err_buf[2048];
+#else
+    static __thread char z_err_buf[2048];
+#endif
+
+// Helpers.
+static void zlog__init_mutex(void) 
+{
+    if (zlog__state.init) 
+    {
+        return;
+    }
+#   if defined(_WIN32)
+    InitializeCriticalSection(&zlog__state.mutex);
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD dwMode = 0;
+    GetConsoleMode(hOut, &dwMode);
+    SetConsoleMode(hOut, dwMode | 0x0004);
+#   else
+    pthread_mutex_init(&zlog__state.mutex, NULL);
+#   endif
+    zlog__state.init = true;
+}
+
+static void zlog__lock(void) 
+{
+    if (!zlog__state.init) 
+    {
+        zlog__init_mutex();
+    }
+#   if defined(_WIN32)
+    EnterCriticalSection(&zlog__state.mutex);
+#   else
+    pthread_mutex_lock(&zlog__state.mutex);
+#   endif
+}
+
+static void zlog__unlock(void) 
+{
+    if (!zlog__state.init) 
+    {
+        return;
+    }
+#   if defined(_WIN32)
+    LeaveCriticalSection(&zlog__state.mutex);
+#   else
+    pthread_mutex_unlock(&zlog__state.mutex);
+#   endif
+}
+
+static void zlog__get_time(char *buf, size_t size) 
+{
+#   if defined(ZTIME_H)
+    ztime_fmt_now(buf, size);
+#   else
+    time_t t = time(NULL);
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+
+#   ifdef _WIN32
+    localtime_s(&tm, &t);
+#   else
+    struct tm *ptr = localtime(&t);
+    if (ptr) 
+    {
+        tm = *ptr;
+    }
+#   endif
+    strftime(buf, size, "%Y-%m-%d %H:%M:%S", &tm);
+#endif
+}
+
+void zlog_init(const char *file_path, zlog_level min_level) 
+{
+    zlog__init_mutex();
+    zlog__state.level = min_level;
+    if (file_path) 
+    {
+        zlog__state.fp = fopen(file_path, "a");
+    }
+}
+
+void zlog_set_level(zlog_level level) 
+{ 
+    zlog__state.level = level; 
+}
+
+static void zlog__print_internal(zlog_level lvl, const char *label, const char *time_str, 
+                                 const char *msg, const char *file, int line, const char *func, const char *extra) 
+{
+    if (zlog__state.colors) 
+    {
+        fprintf(stderr, "\n%s[%s] %s:%s %s\n", zlog__colors[lvl], time_str, label, "\x1b[0m", msg);
+        fprintf(stderr, "    \x1b[90mat\x1b[0m %s (%s:%d)%s\n", func ? func : "?", file, line, extra ? extra : "");
+    } 
+    else 
+    {
+        fprintf(stderr, "\n[%s] %s: %s\n", time_str, label, msg);
+        fprintf(stderr, "    at %s (%s:%d)%s\n", func ? func : "?", file, line, extra ? extra : "");
+    }
+    if (zlog__state.fp) 
+    {
+        fprintf(zlog__state.fp, "\n[%s] %s: %s\n", time_str, label, msg);
+        fprintf(zlog__state.fp, "    at %s (%s:%d)%s\n", func ? func : "?", file, line, extra ? extra : "");
+        fflush(zlog__state.fp);
+    }
+}
+
+void zlog_msg(zlog_level level, const char *file, int line, const char *func, const char *fmt, ...) 
+{
+    if (level < zlog__state.level) 
+    {
+        return;
+    }
+    char time_buf[64];
+    zlog__get_time(time_buf, sizeof(time_buf));
+    char msg_buf[2048];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(msg_buf, sizeof(msg_buf), fmt, args);
+    va_end(args);
+
+    zlog__lock();
+    zlog__print_internal(level, zlog__labels[level], time_buf, msg_buf, file, line, func, NULL);
+    zlog__unlock();
 }
 
 void zerr_print(zerr e) 
 {
-    fprintf(stderr, "\n%s[!] Error:%s %s\n", ZERROR_COL_RED, ZERROR_COL_RST, e.msg);
-    fprintf(stderr, "    %sat%s %s (%s:%d) %s[Origin]%s\n", 
-            ZERROR_COL_GRY, ZERROR_COL_RST,
-            e.func ? e.func : "unknown", 
-            e.file, 
-            e.line,
-            ZERROR_COL_YEL, ZERROR_COL_RST);
+    char time_buf[64];
+    zlog__get_time(time_buf, sizeof(time_buf));
+    char extra_buf[1024] = {0};
     if (e.source) 
     {
-         fprintf(stderr, "    %s[Expr]%s %s\n", ZERROR_COL_GRY, ZERROR_COL_RST, e.source);
+        snprintf(extra_buf, sizeof(extra_buf), "\n    [Expr] %s", e.source);
     }
-    fprintf(stderr, "\n");
+
+    zlog__lock();
+    zlog__print_internal(ZLOG_ERROR, "Error", time_buf, e.msg, e.file, e.line, e.func, extra_buf);
+    zlog__unlock();
 }
 
 void zerr_panic(const char *msg, const char *file, int line) 
 {
-    fprintf(stderr, "\n%s[PANIC]%s %s\n", ZERROR_COL_BG_RED, ZERROR_COL_RST, msg);
-    fprintf(stderr, "        at %s:%d\n\n", file, line);
+    char time_buf[64];
+    zlog__get_time(time_buf, sizeof(time_buf));
+    zlog__lock();
+    zlog__print_internal(ZLOG_FATAL, "PANIC", time_buf, msg, file, line, "!", NULL);
+    zlog__unlock();
     ZERROR_TRAP();
     ZERROR_PANIC_ACTION();
 }
 
-zerr zerr_create_impl(int code, const char *file, int line, const char *func, const char *fmt, ...)
+zerr zerr_create_impl(int code, const char *file, int line, const char *func, const char *fmt, ...) 
 {
-    char *buf = zerr_get_buf();
     va_list args;
     va_start(args, fmt);
-    vsnprintf(buf, 2048, fmt, args);
+    vsnprintf(z_err_buf, sizeof(z_err_buf), fmt, args);
     va_end(args);
-
-    return (zerr){ .code = code, .msg = buf, .file = file, .line = line, .func = func, .source = NULL };
+    return (zerr)
+    { 
+        .code = code, 
+        .msg = z_err_buf, 
+        .file = file, 
+        .line = line, 
+        .func = func, 
+        .source = NULL 
+    };
 }
 
-zerr zerr_errno_impl(int code, const char *file, int line, const char *func, const char *fmt, ...)
+zerr zerr_errno_impl(int code, const char *file, int line, const char *func, const char *fmt, ...) 
 {
-    char *buf = zerr_get_buf();
+    char temp[1024];
     va_list args;
     va_start(args, fmt);
-    int len = vsnprintf(buf, 2048, fmt, args);
+    vsnprintf(temp, sizeof(temp), fmt, args);
     va_end(args);
-
-    if (len < 2000) 
-    {
-        snprintf(buf + len, 2048 - len, ": %s", strerror(errno));
-    }
-
-    return (zerr){ .code = code, .msg = buf, .file = file, .line = line, .func = func, .source = NULL };
+    snprintf(z_err_buf, sizeof(z_err_buf), "%s: %s", temp, strerror(errno));
+    return (zerr)
+    { 
+        .code = code,
+         .msg = z_err_buf, 
+         .file = file, 
+         .line = line, 
+         .func = func, 
+         .source = NULL 
+        };
 }
 
 zerr zerr_add_trace(zerr e, const char *func, const char *file, int line) 
 {
-    char *buf = zerr_get_buf();
-    
-    int len = snprintf(buf, 2048, "%s", e.msg);
-    if (len >= 2048) 
-    {
-        len = 2047;
-    }
-
-    if (len < 2000) 
-    {
-        snprintf(buf + len, 2048 - len, "\n    %sat%s %s (%s:%d)", ZERROR_COL_GRY, ZERROR_COL_RST, func, file, line);
-    }
-    
-    return (zerr){ .code = e.code, .msg = buf, .file = e.file, .line = e.line, .func = e.func, .source = e.source };
+    char combined[2048];
+    const char *msg = e.msg ? e.msg : "Unknown Error";
+    snprintf(combined, sizeof(combined), "%s\n    at %s (%s:%d)", msg, func, file, line);
+    snprintf(z_err_buf, sizeof(z_err_buf), "%s", combined);
+    e.msg = z_err_buf;
+    return e;
 }
 
 zerr zerr_wrap(zerr e, const char *fmt, ...) 
-{
-    char *buf = zerr_get_buf();
+{ 
+    char new_msg[1024];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(new_msg, sizeof(new_msg), fmt, args);
+    va_end(args);
     
-    int len = snprintf(buf, 2048, "%s", e.msg);
-    if (len >= 2048) 
-    {
-        len = 2047;
-    }
-
-    int remaining = 2048 - len - 1;
-    if (remaining > 50) 
-    { 
-        strncat(buf, "\n  ", remaining);
-        strncat(buf, ZERROR_COL_RED, remaining);
-        strncat(buf, "|", remaining);
-        strncat(buf, ZERROR_COL_RST, remaining);
-        strncat(buf, " context: ", remaining);
-        
-        len = strlen(buf);
-        remaining = 2048 - len - 1;
-
-        if (remaining > 0) 
-        {
-            va_list args;
-            va_start(args, fmt);
-            vsnprintf(buf + len, remaining, fmt, args);
-            va_end(args);
-        }
-    }
-    return (zerr){ .code = e.code, .msg = buf, .file = e.file, .line = e.line, .func = e.func, .source = e.source };
-}
+    char combined[2048];
+    snprintf(combined, sizeof(combined), "%s: %s", new_msg, e.msg);
+    snprintf(z_err_buf, sizeof(z_err_buf), "%s", combined);
+    e.msg = z_err_buf;
+    return e; 
+} 
 
 int zerr_run(zres result) 
 {
@@ -848,10 +1024,6 @@ int zerr_run(zres result)
     }
     return 0;
 }
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
 
 #endif // ZERROR_IMPLEMENTATION_GUARD
 #endif // ZERROR_IMPLEMENTATION

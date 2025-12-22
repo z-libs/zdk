@@ -13,5 +13,6 @@
 #include "zfile.h"
 #include "zwasm.h"
 #include "znet.h"
+#include "ztime.h"
 
 #endif // ZWORLD_H
