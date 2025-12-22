@@ -20,6 +20,7 @@ It is designed to provide a "Standard Library Extension" experience, offering es
 | **zfile.h**   | Cross-platform file system library.  | Yes |
 | **zwasm.h**   | Freestanding WebAssembly binary generator. | Yes |
 | **znet.h**    | Networking library that unifies TCP, UDP, and HTTP. | Yes |
+| **ztime.h**   | simple, cross-platform time and clock library. | Yes |
 | **zerror.h**  | Result types (`Result<T,E>`) and stack tracing. | No |
 | **zalloc.h**  | Custom memory allocator wrappers and tracking. | No |
 | **zops.h**    | Polymorphic API that glues the rest of `z-libs` | No |

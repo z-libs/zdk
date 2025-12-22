@@ -18,7 +18,7 @@ jobs:
       - name: Download Headers
         run: |
           # 1. Download EVERYTHING for the package
-          libs=( "zvec" "zlist" "zmap" "zstr" "zalloc" "zops" "zerror" "zrand" "zmath" "zthread" "ztree" "zfile" "zwasm" "znet")
+          libs=( "zvec" "zlist" "zmap" "zstr" "zalloc" "zops" "zerror" "zrand" "zmath" "zthread" "ztree" "zfile" "zwasm" "znet" "ztime")
           BASE_URL="https://raw.githubusercontent.com/z-libs"
           
           echo "Fetching latest headers..."
@@ -36,7 +36,7 @@ jobs:
           
           # We only include "safe" utility libraries in zworld.h
           # Excluded: zerror.h, zalloc.h, zops.h (require manual config/order)
-          libs=( "zvec" "zlist" "zmap" "zstr" "zrand" "zmath" "zthread" "zfile" "zwasm" "znet" )
+          libs=( "zvec" "zlist" "zmap" "zstr" "zrand" "zmath" "zthread" "zfile" "zwasm" "znet" "ztime" )
           
           for lib in "${libs[@]}"; do
             echo "#include \"$lib.h\"" >> zworld.h

@@ -18,8 +18,9 @@
     "zvec.h",
     "zthread.h",
     "ztree.h",
-    "zfile",
-    "zwasm",
-    "znet"
+    "zfile.h",
+    "zwasm.h",
+    "znet.h",
+    "ztime.h"
   ]
 }
